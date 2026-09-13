@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ─── */
+@layer base {
+  body {
+    @apply font-inter text-osas-text bg-white antialiased transition-colors duration-300;
+  }
+  .dark body,
+  .dark {
+    @apply bg-[#0f1117] text-white;
+  }
+}
+
+@layer components {
+  /* ─── Section Labels ─── */
+  .section-label {
+    @apply text-osas-primary dark:text-osas-accent text-xs font-bold uppercase tracking-[0.15em] mb-3 block;
+  }
+  .section-title {
+    @apply text-3xl md:text-4xl font-extrabold font-poppins text-osas-text dark:text-white leading-tight mb-4;
+  }
+  .section-subtitle {
+    @apply text-gray-500 dark:text-white/80 text-base md:text-lg leading-relaxed;
+  }
+
+  /* ─── Section Backgrounds ─── */
+  .section-white {
+    @apply bg-white dark:bg-[#0f1117];
+  }
+  .section-gray {
+    @apply bg-gray-50 dark:bg-[#161b22];
+  }
+
+  /* ─── Buttons ─── */
+  .btn-primary {
+    @apply bg-osas-primary text-white px-7 py-3 rounded-xl font-semibold text-sm 
+           hover:bg-osas-secondary transition-all duration-200 shadow-sm 
+           inline-flex items-center gap-2 active:scale-95;
+  }
+  .btn-outline {
+    @apply border-2 border-osas-primary text-osas-primary dark:text-osas-accent dark:border-osas-accent
+           px-7 py-3 rounded-xl font-semibold text-sm 
+           hover:bg-osas-primary hover:text-white dark:hover:bg-osas-accent dark:hover:text-black
+           transition-all duration-200 inline-flex items-center gap-2 active:scale-95;
+  }
+  .btn-ghost {
+    @apply text-osas-primary dark:text-osas-accent font-semibold text-sm 
+           hover:text-osas-secondary transition-colors duration-200 inline-flex items-center gap-2;
+  }
+
+  /* ─── Cards ─── */
+  .card {
+    @apply bg-white dark:bg-[#1e2430] rounded-2xl border border-gray-100 dark:border-gray-700/50 
+           shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden;
+  }
+
+  /* ─── Icon Box ─── */
+  .icon-box {
+    @apply bg-osas-primary/10 dark:bg-osas-primary/20 text-osas-primary dark:text-osas-accent 
+           flex items-center justify-center transition-all duration-300;
+  }
+
+  /* ─── Badge ─── */
+  .badge {
+    @apply text-xs font-bold uppercase tracking-wider text-osas-primary dark:text-osas-accent 
+           bg-osas-primary/10 dark:bg-osas-primary/20 px-3 py-1 rounded-full;
+  }
+
+  /* ─── Inputs ─── */
+  .form-input {
+    @apply px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 
+           bg-white dark:bg-[#0f1117] text-sm text-gray-800 dark:text-gray-200 
+           placeholder-gray-400 dark:placeholder-gray-500
+           focus:outline-none focus:border-osas-primary focus:ring-2 focus:ring-osas-primary/15 
+           transition-all w-full;
+  }
+}
+
+/* ─── Swiper ─── */
+.swiper-pagination-bullet {
+  background: rgba(255,255,255,0.45) !important;
+  opacity: 1 !important;
+  width: 8px !important;
+  height: 8px !important;
+  transition: all 0.3s !important;
+}
+.swiper-pagination-bullet-active {
+  background: #2ECC71 !important;
+  width: 24px !important;
+  border-radius: 4px !important;
+}
+.swiper-button-next,
+.swiper-button-prev {
+  color: #FFFFFF !important;
+  background: rgba(0,0,0,0.3) !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  backdrop-filter: blur(4px) !important;
+  transition: background 0.2s !important;
+}
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+  background: rgba(11,110,79,0.75) !important;
+}
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+/* ─── React Big Calendar dark overrides ─── */
+.dark .rbc-calendar,
+.dark .rbc-toolbar,
+.dark .rbc-month-view,
+.dark .rbc-time-view {
+  background: #1e2430;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+.dark .rbc-header {
+  background: #0B6E4F;
+  color: #fff;
+  border-color: #374151;
+}
+.dark .rbc-day-bg,
+.dark .rbc-time-slot {
+  border-color: #374151;
+}
+.dark .rbc-today {
+  background: rgba(11,110,79,0.15);
+}
+.dark .rbc-off-range-bg {
+  background: #161b22;
+}
+.dark .rbc-event {
+  background: #0B6E4F;
+}
+.dark .rbc-toolbar button {
+  color: #e5e7eb;
+  border-color: #374151;
+}
+.dark .rbc-toolbar button:hover {
+  background: rgba(11,110,79,0.2);
+}
+.dark .rbc-toolbar button.rbc-active {
+  background: #0B6E4F;
+  color: #fff;
+  border-color: #0B6E4F;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #0B6E4F; border-radius: 99px; }
+.dark ::-webkit-scrollbar-thumb { background: #2ECC71; }
+
+/* ─── Particle blob ─── */
+.blob {
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Bottom Navigation Curve ─── */
+.nav-curve {
+  position: absolute;
+  top: -24px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: transparent;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 24px 0 0 white;
+  pointer-events: none;
+}
+.dark .nav-curve {
+  box-shadow: 0 24px 0 0 #0f1117;
+}
+
+.nav-curve::before {
+  content: '';
+  position: absolute;
+  top: 24px;
+  left: -20px;
+  width: 20px;
+  height: 20px;
+  background-color: transparent;
+  border-top-right-radius: 20px;
+  box-shadow: 0px -10px 0 0 white;
+}
+.dark .nav-curve::before {
+  box-shadow: 0px -10px 0 0 #0f1117;
+}
+
+.nav-curve::after {
+  content: '';
+  position: absolute;
+  top: 24px;
+  right: -20px;
+  width: 20px;
+  height: 20px;
+  background-color: transparent;
+  border-top-left-radius: 20px;
+  box-shadow: 0px -10px 0 0 white;
+}
+.dark .nav-curve::after {
+  box-shadow: 0px -10px 0 0 #0f1117;
+}

@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Student Nexus",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "orientation": "portrait",
+    "icon": "./src/images/student nexus logo.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./src/images/student nexus logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.studentnexus.app"
+    },
+    "android": {
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./src/images/student nexus logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.studentnexus.app",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser",
+      "expo-notifications",
+      "expo-updates"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "46103cfe-2f5a-4663-a879-7762462f5b3e"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/46103cfe-2f5a-4663-a879-7762462f5b3e"
+    }
+  }
+}
