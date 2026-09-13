@@ -139,29 +139,29 @@ const NAV_GROUPS = [
   {
     label: 'Management',
     items: [
-      { to: '/kanban',           icon: KanbanSquare,  label: 'Kanban Board'    },
-      { to: '/register',         icon: ClipboardList, label: 'Booking Register'},
-      { to: '/calendar',         icon: Calendar,      label: 'Event Calendar'  },
-      { to: '/announcements',    icon: Megaphone,     label: 'Announcements'   },
+      { to: '/kanban', icon: KanbanSquare, label: 'Kanban Board' },
+      { to: '/register', icon: ClipboardList, label: 'Booking Register' },
+      { to: '/calendar', icon: Calendar, label: 'Event Calendar' },
+      { to: '/announcements', icon: Megaphone, label: 'Announcements' },
     ],
   },
   {
     label: 'Communication',
     items: [
-      { to: '/messages',         icon: MessageSquare, label: 'Messages'        },
-      { to: '/contact-messages', icon: Mail,          label: 'Contact Inbox'  },
-      { to: '/search',           icon: Bot,           label: 'AI Assistant'    },
-      { to: '/faculty-requests', icon: Package,       label: 'Faculty Requests'},
+      { to: '/messages', icon: MessageSquare, label: 'Messages' },
+      { to: '/contact-messages', icon: Mail, label: 'Contact Inbox' },
+      { to: '/search', icon: Bot, label: 'AI Assistant' },
+      { to: '/faculty-requests', icon: Package, label: 'Faculty Requests' },
     ],
   },
   {
     label: 'Records',
     items: [
-      { to: '/users',      icon: Users,       label: 'Users'          },
-      { to: '/portfolios', icon: Award,       label: 'Portfolios'     },
-      { to: '/compliance', icon: ShieldCheck, label: 'Compliance'     },
-      { to: '/repository', icon: Archive,     label: 'Repository'     },
-      { to: '/reports',    icon: FileBarChart,label: 'Reports'        },
+      { to: '/users', icon: Users, label: 'Users' },
+      { to: '/portfolios', icon: Award, label: 'Portfolios' },
+      { to: '/compliance', icon: ShieldCheck, label: 'Compliance' },
+      { to: '/repository', icon: Archive, label: 'Repository' },
+      { to: '/reports', icon: FileBarChart, label: 'Reports' },
     ],
   },
 ];

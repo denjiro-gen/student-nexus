@@ -6,7 +6,7 @@ const today = () => new Date().toISOString().split('T')[0];
 
 export const adminAPI = {
 
-  
+
   getDashboardStats: async () => {
     try {
       const [due, inProc, pending, completed, totalUsers, totalOrgs] =
@@ -39,12 +39,12 @@ export const adminAPI = {
 
       return {
         data: {
-          dueToday:     due.value?.count      ?? 0,
-          inProgress:   inProc.value?.count   ?? 0,
+          dueToday: due.value?.count ?? 0,
+          inProgress: inProc.value?.count ?? 0,
           pendingReview: pending.value?.count ?? 0,
-          completed:    completed.value?.count ?? 0,
-          totalUsers:   totalUsers.value?.count ?? 0,
-          totalOrgs:    totalOrgs.value?.count  ?? 0,
+          completed: completed.value?.count ?? 0,
+          totalUsers: totalUsers.value?.count ?? 0,
+          totalOrgs: totalOrgs.value?.count ?? 0,
         },
         error: null,
       };
@@ -57,7 +57,7 @@ export const adminAPI = {
     }
   },
 
-  
+
   getRecentEvents: async (limit = 5) => {
     const { data, error } = await supabase
       .from('event_proposals')
@@ -86,7 +86,7 @@ export const adminAPI = {
   },
 
 
-  
+
   getEventProposals: async () => {
     const { data, error } = await supabase
       .from('event_proposals')
@@ -129,7 +129,7 @@ export const adminAPI = {
     return { data, error };
   },
 
-  
+
   getEventById: async (id) => {
     const { data, error } = await supabase
       .from('event_proposals')
@@ -143,7 +143,7 @@ export const adminAPI = {
     return { data, error };
   },
 
-  
+
   deleteEventProposal: async (eventId) => {
     const { error } = await supabase
       .from('event_proposals')
@@ -155,7 +155,7 @@ export const adminAPI = {
   updateEventStatus: async (eventId, status, reviewNotes = null) => {
     const updates = {
       status,
-      updated_at:  new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       reviewed_at: new Date().toISOString(),
     };
     if (reviewNotes) updates.review_notes = reviewNotes;
@@ -170,18 +170,18 @@ export const adminAPI = {
     if (data && !error) {
       try {
         await adminAPI.logAction('UPDATE_EVENT_STATUS', 'event_proposal', eventId, null, { status, reviewNotes });
-      } catch (logErr) {}
+      } catch (logErr) { }
 
       if (data.submitted_by) {
         try {
           const { data: { user: adminUser } } = await supabase.auth.getUser();
-          
+
           let title = 'Event Proposal Updated';
           let body = `Your event proposal "${data.title}" status has been updated to: ${status}.`;
-          
+
           if (reviewNotes) {
             body += `\n\nAdmin Message: ${reviewNotes}`;
-            
+
             if (adminUser) {
               await adminAPI.sendMessage(adminUser.id, data.submitted_by, `Update on "${data.title}" (${status}):\n${reviewNotes}`);
             }
@@ -205,7 +205,7 @@ export const adminAPI = {
     return { data, error };
   },
 
-  
+
   getOrganizations: async () => {
     const { data, error } = await supabase
       .from('organizations')
@@ -220,7 +220,7 @@ export const adminAPI = {
     return { data, error };
   },
 
-  
+
   getUsers: async () => {
     const { data, error } = await supabase
       .from('users')
@@ -240,7 +240,7 @@ export const adminAPI = {
   },
 
 
-  
+
   getComplianceList: async () => {
     const { data, error } = await supabase
       .from('organization_compliance')
@@ -275,7 +275,7 @@ export const adminAPI = {
         .select('president_id, advisor_id')
         .eq('id', data.organization_id)
         .single();
-        
+
       if (orgData) {
         let title = 'Compliance Status Updated';
         let msg = `Compliance requirement for ${data.organization?.name} is now marked as ${status}.`;
@@ -295,7 +295,7 @@ export const adminAPI = {
           if (adminUser && notes && notes.trim()) {
             await adminAPI.sendMessage(adminUser.id, recipientId, `Compliance Update for ${data.organization?.name} (${status}):\n${notes}`);
           }
-          
+
           await adminAPI.sendNotification(recipientId, title, msg, 'compliance_update');
 
           try {
@@ -309,7 +309,7 @@ export const adminAPI = {
                 await window.api.sendPushNotification(userData.expo_push_token, title, msg, { type: 'compliance_update', organizationId: data.organization_id });
               }
             }
-          } catch (pushErr) {}
+          } catch (pushErr) { }
         }
       }
     }
@@ -335,7 +335,7 @@ export const adminAPI = {
 
 
 
-  
+
   getAuditLogs: async (limit = 50) => {
     const { data, error } = await supabase
       .from('audit_logs')
@@ -348,24 +348,24 @@ export const adminAPI = {
     return { data, error };
   },
 
-  
+
   logAction: async (action, entityType, entityId, oldValues = null, newValues = null) => {
     const { error } = await supabase
       .from('audit_logs')
       .insert({
         action,
         entity_type: entityType,
-        entity_id:   entityId,
-        old_values:  oldValues,
-        new_values:  newValues,
+        entity_id: entityId,
+        old_values: oldValues,
+        new_values: newValues,
       });
     return { error };
   },
 
-  
+
   verifyDocumentHash: async (entityId, fileUrl) => {
     try {
-      
+
       const { data: hashRecord, error } = await supabase
         .from('document_hashes')
         .select('file_hash')
@@ -373,15 +373,15 @@ export const adminAPI = {
         .order('uploaded_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       if (error || !hashRecord) return { verified: false, error: 'No hash found' };
 
-      
+
       const response = await fetch(fileUrl);
       if (!response.ok) return { verified: false, error: 'Failed to fetch file' };
       const blob = await response.blob();
 
-      
+
       const currentHash = await computeFileHash(blob);
       return { verified: currentHash === hashRecord.file_hash, error: null };
     } catch (err) {
@@ -389,7 +389,7 @@ export const adminAPI = {
     }
   },
 
-  
+
   getAllPortfolios: async () => {
     const { data, error } = await supabase
       .from('student_portfolios')
@@ -535,11 +535,11 @@ export const adminAPI = {
           // Use Electron IPC to send from Node.js (bypasses browser CORS)
           const pushResult = window.api?.sendPushNotification
             ? await window.api.sendPushNotification(
-                userData.expo_push_token,
-                title,
-                msg,
-                { type: 'faculty_request', requestId: data.id }
-              )
+              userData.expo_push_token,
+              title,
+              msg,
+              { type: 'faculty_request', requestId: data.id }
+            )
             : null;
           console.log('[PUSH DEBUG] Faculty push result:', JSON.stringify(pushResult));
         }
@@ -568,7 +568,7 @@ export const adminAPI = {
   saveChatMessage: async (role, message, componentType = null, payload = null) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'No auth user' };
-    
+
     const { error } = await supabase
       .from('ai_chats')
       .insert({
@@ -581,7 +581,7 @@ export const adminAPI = {
     return { error };
   },
 
-  
+
   // ========================
   // MESSAGING
   // ========================

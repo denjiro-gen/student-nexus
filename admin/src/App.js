@@ -91,19 +91,19 @@ function App() {
             {/* Protected admin routes */}
             {isAuthed ? (
               <Route element={<AdminLayout />}>
-                <Route path="/dashboard"       element={<AdminDashboard />} />
-                <Route path="/kanban"           element={<AdminKanban />} />
-                <Route path="/register"         element={<InstitutionalRegister />} />
-                <Route path="/calendar"         element={<AdminCalendar />} />
-                <Route path="/announcements"    element={<AdminAnnouncements />} />
-                <Route path="/communications"   element={<AdminCommunications />} />
-                <Route path="/messages"         element={<AdminMessages />} />
-                <Route path="/search"           element={<AdminSearch />} />
-                <Route path="/users"            element={<AdminUsers />} />
-                <Route path="/portfolios"       element={<AdminPortfolios />} />
-                <Route path="/compliance"       element={<AdminCompliance />} />
-                <Route path="/repository"       element={<AdminRepository />} />
-                <Route path="/reports"          element={<AdminReports />} />
+                <Route path="/dashboard" element={<AdminDashboard />} />
+                <Route path="/kanban" element={<AdminKanban />} />
+                <Route path="/register" element={<InstitutionalRegister />} />
+                <Route path="/calendar" element={<AdminCalendar />} />
+                <Route path="/announcements" element={<AdminAnnouncements />} />
+                <Route path="/communications" element={<AdminCommunications />} />
+                <Route path="/messages" element={<AdminMessages />} />
+                <Route path="/search" element={<AdminSearch />} />
+                <Route path="/users" element={<AdminUsers />} />
+                <Route path="/portfolios" element={<AdminPortfolios />} />
+                <Route path="/compliance" element={<AdminCompliance />} />
+                <Route path="/repository" element={<AdminRepository />} />
+                <Route path="/reports" element={<AdminReports />} />
                 <Route path="/faculty-requests" element={<AdminFacultyRequests />} />
                 <Route path="/contact-messages" element={<AdminContactMessages />} />
               </Route>

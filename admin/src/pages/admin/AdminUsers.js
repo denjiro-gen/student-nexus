@@ -169,17 +169,17 @@ const RoleBadge = styled.span`
   padding: 3px 10px;
   border-radius: 20px;
   background: ${p => {
-    if (p.$r === 'admin')          return '#fce7f3';
-    if (p.$r === 'osas_staff')     return '#dbeafe';
+    if (p.$r === 'admin') return '#fce7f3';
+    if (p.$r === 'osas_staff') return '#dbeafe';
     if (p.$r === 'student_leader') return '#d1fae5';
-    if (p.$r === 'advisor')        return '#fef3c7';
+    if (p.$r === 'advisor') return '#fef3c7';
     return '#f3f4f6';
   }};
   color: ${p => {
-    if (p.$r === 'admin')          return '#9d174d';
-    if (p.$r === 'osas_staff')     return '#1d4ed8';
+    if (p.$r === 'admin') return '#9d174d';
+    if (p.$r === 'osas_staff') return '#1d4ed8';
     if (p.$r === 'student_leader') return '#065f46';
-    if (p.$r === 'advisor')        return '#92400e';
+    if (p.$r === 'advisor') return '#92400e';
     return '#374151';
   }};
   text-transform: capitalize;
@@ -272,11 +272,11 @@ const LoadingRow = styled.div`
 `;
 
 const ROLE_COLORS = {
-  admin:          '#9d174d',
-  osas_staff:     '#1d4ed8',
+  admin: '#9d174d',
+  osas_staff: '#1d4ed8',
   student_leader: GREEN,
-  advisor:        '#92400e',
-  student:        '#6b7280',
+  advisor: '#92400e',
+  student: '#6b7280',
 };
 
 function formatRole(role) {
@@ -284,8 +284,8 @@ function formatRole(role) {
 }
 
 export default function AdminUsers() {
-  const [users,   setUsers]   = useState([]);
-  const [search,  setSearch]  = useState('');
+  const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
@@ -302,7 +302,7 @@ export default function AdminUsers() {
   const toggleStatus = async (user) => {
     const newStatus = !user.is_active;
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: newStatus } : u));
-    
+
     const { error } = await adminAPI.updateUserStatus(user.id, newStatus);
     if (error) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: user.is_active } : u));
@@ -328,10 +328,10 @@ export default function AdminUsers() {
     return matchSearch && matchRole;
   });
 
-  
-  const totalActive   = users.filter(u => u.is_active).length;
+
+  const totalActive = users.filter(u => u.is_active).length;
   const totalStudents = users.filter(u => u.role === 'student' || u.role === 'student_leader').length;
-  const totalStaff    = users.filter(u => u.role === 'admin' || u.role === 'osas_staff').length;
+  const totalStaff = users.filter(u => u.role === 'admin' || u.role === 'osas_staff').length;
   const totalAdvisors = users.filter(u => u.role === 'advisor').length;
 
   return (
@@ -366,7 +366,7 @@ export default function AdminUsers() {
         </Controls>
       </TopRow>
 
-      {}
+      { }
       <StatsRow>
         <StatChip $bg="#dcfce7">
           <div className="icon"><Users size={18} color={GREEN} /></div>
@@ -398,7 +398,7 @@ export default function AdminUsers() {
         </StatChip>
       </StatsRow>
 
-      {}
+      { }
       <TableWrap>
         <TableHead>
           <span>User</span>
@@ -471,7 +471,7 @@ export default function AdminUsers() {
         </TableBody>
       </TableWrap>
 
-      {}
+      { }
       {!loading && (
         <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280', textAlign: 'right' }}>
           Showing {filtered.length} of {users.length} users
