@@ -112,7 +112,7 @@ const WelcomeSection = () => {
                 Discover Our Mission
               </button>
               <a
-                href="http://localhost:5174"
+                href="https://submission-portal-cdm.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-outline"

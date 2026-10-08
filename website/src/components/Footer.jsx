@@ -87,7 +87,7 @@ const Footer = () => {
               ))}
               <li>
                 <a
-                  href="http://localhost:5174"
+                  href="https://submission-portal-cdm.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-osas-accent text-sm hover:text-white cursor-pointer transition-colors duration-200 flex items-center gap-1.5 group"

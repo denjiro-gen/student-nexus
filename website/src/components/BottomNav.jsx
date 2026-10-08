@@ -14,7 +14,7 @@ const navItems = [
 const extraLinks = [
   { name: 'Team', path: '/#staff', external: false },
   { name: 'Contact', path: '/#contact', external: false },
-  { name: 'Submit Online', path: 'http://localhost:5174', external: true },
+  { name: 'Submit Online', path: 'https://submission-portal-cdm.vercel.app/', external: true },
 ];
 
 const BottomNav = () => {

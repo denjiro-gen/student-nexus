@@ -6,6 +6,13 @@
 
 /* ─── Base ─── */
 @layer base {
+  :root {
+    --color-text: #222222;
+  }
+  .dark {
+    --color-text: #ffffff;
+  }
+
   body {
     @apply font-inter text-osas-text bg-white antialiased transition-colors duration-300;
   }

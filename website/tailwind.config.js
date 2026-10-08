@@ -13,7 +13,7 @@ module.exports = {
         'osas-accent':       '#2ECC71',
         'osas-bg':           '#FFFFFF',
         'osas-secondary-bg': '#F8F9FA',
-        'osas-text':         '#222222',
+        'osas-text':         'var(--color-text, #222222)',
       },
       fontFamily: {
         poppins: ['Poppins', 'sans-serif'],
