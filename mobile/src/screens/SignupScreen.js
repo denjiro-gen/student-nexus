@@ -151,7 +151,7 @@ export default function SignupScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [orgs, setOrgs] = useState([]);
   const [orgsLoading, setOrgsLoading] = useState(false);
-  const [role, setRole] = useState('student_leader'); // 'student_leader' | 'faculty'
+  const [role, setRole] = useState('student_leader'); // 'student_leader'
 
   // Shared fields
   const [email, setEmail] = useState('');
@@ -246,13 +246,6 @@ export default function SignupScreen({ navigation }) {
             >
               <Text style={[s.tabTxt, role === 'student_leader' && s.tabTxtActive]}>Student Leader</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.tab, role === 'faculty' && s.tabActive]}
-              onPress={() => setRole('faculty')}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.tabTxt, role === 'faculty' && s.tabTxtActive]}>Faculty</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Shared fields */}
@@ -287,13 +280,7 @@ export default function SignupScreen({ navigation }) {
             </>
           )}
 
-          {/* Faculty info box */}
-          {role === 'faculty' && (
-            <View style={s.infoBox}>
-              <Feather name="info" size={16} color={INFO_TEXT} style={{ marginTop: 2 }} />
-              <Text style={s.infoTxt}>Faculty accounts can submit requests for equipment, chairs, and other facility needs directly to OSAS.</Text>
-            </View>
-          )}
+
 
           <InputField label="Password" icon="lock" placeholder="Min. 6 characters" secureEntry value={password} onChangeText={setPassword} />
           <InputField label="Confirm Password" icon="lock" placeholder="Re-enter password" secureEntry value={confirmPassword} onChangeText={setConfirmPassword} />
@@ -362,9 +349,7 @@ const s = StyleSheet.create({
   dropItemSel: { backgroundColor: G_LT },
   dropItemTxt: { fontFamily: 'Poppins_500Medium', fontSize: 13, color: TEXT },
 
-  // Faculty info box
-  infoBox: { flexDirection: 'row', gap: 10, backgroundColor: INFO_BG, padding: 14, borderRadius: 12, marginBottom: 18 },
-  infoTxt: { flex: 1, fontFamily: 'Poppins_400Regular', fontSize: 13, color: INFO_TEXT, lineHeight: 20 },
+
 
   // Create Account button
   createBtn: { flexDirection: 'row', backgroundColor: GREEN, borderRadius: 50, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', marginTop: 8, shadowColor: GREEN_DARK, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },

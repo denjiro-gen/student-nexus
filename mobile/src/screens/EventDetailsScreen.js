@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, StatusBar, Alert, Linking
+  TouchableOpacity, ActivityIndicator, StatusBar, Alert
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -38,9 +38,78 @@ function InfoRow({ icon, label, value, last, colors }) {
     </>
   );
 }
+
+// ─── Approval History Timeline ────────────────────────────────────────────────
+function ApprovalHistory({ logs, colors, isDark }) {
+  const STATUS_CFG = {
+    approved:  { color: colors.success,    bg: colors.successLight,  icon: 'check-circle', label: 'Approved'  },
+    rejected:  { color: colors.error,      bg: colors.errorLight,    icon: 'x-circle',     label: 'Rejected'  },
+    pending:   { color: colors.warning,    bg: colors.warningLight,  icon: 'clock',        label: 'Pending'   },
+    revision:  { color: colors.warning,    bg: colors.warningLight,  icon: 'edit',         label: 'Revision'  },
+    noted:     { color: '#6366F1',         bg: isDark ? 'rgba(99,102,241,0.2)' : '#EEF2FF', icon: 'eye',   label: 'Noted'     },
+    completed: { color: '#6366F1',         bg: isDark ? 'rgba(99,102,241,0.2)' : '#EEF2FF', icon: 'award', label: 'Completed' },
+  };
+
+  if (!logs || logs.length === 0) {
+    return (
+      <View style={[ah.emptyBox, { backgroundColor: colors.background, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <Feather name="clock" size={16} color={colors.textMuted} />
+        <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 13, flex: 1, lineHeight: 20, color: colors.textMuted }}>
+          No approval actions recorded yet. This event is awaiting review.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {logs.map((log, i) => {
+        const cfg = STATUS_CFG[log.status] || { color: colors.textMuted, bg: colors.border, icon: 'circle', label: log.status };
+        const showRemarks = log.remarks && (log.status === 'rejected' || log.status === 'completed' || log.status === 'revision');
+        const actionBy   = log.action_by?.full_name || 'Office Staff';
+        const officeName = log.action_by?.office_name || log.office_name || 'OSAS';
+        const date = log.actioned_at
+          ? new Date(log.actioned_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+          : '—';
+        return (
+          <View key={log.id || i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12, position: 'relative' }}>
+            {i < logs.length - 1 && (
+              <View style={{ position: 'absolute', left: 17, top: 37, width: 2, bottom: -12, backgroundColor: colors.border, zIndex: 0 }} />
+            )}
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: cfg.bg, alignItems: 'center', justifyContent: 'center', zIndex: 1, flexShrink: 0 }}>
+              <Feather name={cfg.icon} size={14} color={cfg.color} />
+            </View>
+            <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 13, color: colors.text }}>{officeName}</Text>
+                  <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 11, color: colors.textMuted, marginTop: 1 }}>By: {actionBy}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: cfg.bg }}>
+                  <Feather name={cfg.icon} size={10} color={cfg.color} />
+                  <Text style={{ fontFamily: 'Poppins_700Bold', fontSize: 10, color: cfg.color }}>{cfg.label}</Text>
+                </View>
+              </View>
+              {showRemarks ? (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F9FAFB', borderRadius: 8, padding: 8, marginBottom: 6, borderWidth: 1, borderColor: cfg.color + '40' }}>
+                  <Feather name="message-square" size={11} color={cfg.color} style={{ marginRight: 5, marginTop: 2 }} />
+                  <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 12, lineHeight: 18, flex: 1, color: colors.text }}>{log.remarks}</Text>
+                </View>
+              ) : null}
+              <Text style={{ fontFamily: 'Poppins_400Regular', fontSize: 11, textAlign: 'right', color: colors.textMuted }}>{date}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const ah = StyleSheet.create({ emptyBox: {} }); // placeholder to avoid lint warnings
+
 const s = StyleSheet.create({
   infoRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBox: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  iconBox:  { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   infoLbl:  { fontFamily: 'Poppins_500Medium', fontSize: 12 },
   infoVal:  { fontFamily: 'Poppins_600SemiBold', fontSize: 14 },
   divider:  { height: 1, marginVertical: 14 },
@@ -52,9 +121,10 @@ export default function EventDetailsScreen({ navigation, route }) {
   const { colors, isDark } = useTheme();
   const ds = getStyles(colors, isDark);
 
-  const [event, setEvent]           = useState(null);
-  const [attachments, setAttachments] = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [event, setEvent]               = useState(null);
+  const [attachments, setAttachments]   = useState([]);
+  const [approvalLogs, setApprovalLogs] = useState([]);
+  const [loading, setLoading]           = useState(true);
 
   const myId = userProfile?.id || userProfile?.user_id || user?.id;
 
@@ -65,13 +135,15 @@ export default function EventDetailsScreen({ navigation, route }) {
   const loadDetails = async () => {
     try {
       setLoading(true);
-      const [evRes, attRes] = await Promise.all([
+      const [evRes, attRes, logRes] = await Promise.all([
         eventAPI.getEventById(eventId),
         eventAPI.getEventAttachments(eventId),
+        eventAPI.getApprovalHistory(eventId),
       ]);
       if (evRes.error) throw evRes.error;
       setEvent(evRes.data);
       setAttachments(attRes.data || []);
+      setApprovalLogs(logRes.data || []);
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to load event details.');
@@ -84,6 +156,8 @@ export default function EventDetailsScreen({ navigation, route }) {
     approved: { color: colors.success,  bg: colors.successLight, label: 'Approved', icon: 'check-circle' },
     pending:  { color: colors.warning,  bg: colors.warningLight, label: 'Pending',  icon: 'clock'        },
     rejected: { color: colors.error,    bg: colors.errorLight,   label: 'Rejected', icon: 'x-circle'     },
+    revision: { color: colors.warning,  bg: colors.warningLight, label: 'Revision', icon: 'edit'         },
+    completed:{ color: '#6366F1',       bg: isDark ? 'rgba(99,102,241,0.2)' : '#EEF2FF', label: 'Completed', icon: 'award' },
   };
 
   if (loading) {
@@ -105,7 +179,7 @@ export default function EventDetailsScreen({ navigation, route }) {
     );
   }
 
-  const cfg = STATUS_CFG[event.status] || { color: colors.textMuted, bg: colors.border, label: event.status || 'Unknown', icon: 'circle', key: event.status };
+  const cfg = STATUS_CFG[event.status] || { color: colors.textMuted, bg: colors.border, label: event.status || 'Unknown', icon: 'circle' };
   const isOwner     = myId && event.submitted_by === myId;
   const canEdit     = isOwner && event.status === 'pending';
   const isApproved  = event.status === 'approved';
@@ -124,7 +198,7 @@ export default function EventDetailsScreen({ navigation, route }) {
 
   return (
     <View style={ds.root}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.surface} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
 
       <View style={ds.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={ds.backBtn} activeOpacity={0.8}>
@@ -149,7 +223,9 @@ export default function EventDetailsScreen({ navigation, route }) {
               {isApproved
                 ? 'Your proposal has been approved!'
                 : isRejected
-                ? 'Your proposal was rejected. See remarks below.'
+                ? 'Your proposal was rejected. See remarks in Approval History.'
+                : isCompleted
+                ? 'This event has been marked as completed.'
                 : 'Your proposal is pending OSAS review.'}
             </Text>
           </View>
@@ -179,6 +255,12 @@ export default function EventDetailsScreen({ navigation, route }) {
           <InfoRow colors={colors} icon="users"    label="Organization"  value={event.organization?.name || 'Independent'} last />
         </View>
 
+        {/* ── APPROVAL HISTORY ───────────────────────────────── */}
+        <Text style={ds.sectionTitle}>Approval History</Text>
+        <View style={ds.card}>
+          <ApprovalHistory logs={approvalLogs} colors={colors} isDark={isDark} />
+        </View>
+
         <Text style={ds.sectionTitle}>Description</Text>
         <View style={ds.card}>
           <Text style={ds.descTxt}>{event.description || 'No description provided.'}</Text>
@@ -186,7 +268,7 @@ export default function EventDetailsScreen({ navigation, route }) {
 
         {!!event.review_notes && (
           <>
-            <Text style={ds.sectionTitle}>Admin Remarks</Text>
+            <Text style={ds.sectionTitle}>OSAS Remarks</Text>
             <View style={[ds.card, { borderColor: isDark ? 'rgba(239,68,68,0.5)' : '#FCA5A5', borderWidth: 1, backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
                 <Feather name="alert-circle" size={14} color={colors.error} />
@@ -242,8 +324,8 @@ export default function EventDetailsScreen({ navigation, route }) {
           </View>
         ) : (
           allAttachments.map((att, i) => (
-            <TouchableOpacity 
-              key={i} 
+            <TouchableOpacity
+              key={i}
               style={[ds.card, { flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 12 }]}
               onPress={() => WebBrowser.openBrowserAsync(att.file_url)}
             >
@@ -265,18 +347,16 @@ export default function EventDetailsScreen({ navigation, route }) {
           <View style={{ marginTop: 24 }}>
             <Text style={ds.sectionTitle}>Post-Event Requirements</Text>
             <View style={[ds.checklistCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F9FAFB', borderColor: colors.border }]}>
-              <Text style={ds.checklistTitle}>Please submit the following requirements as a single merged PDF (or ZIP archive) after your event:</Text>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Post-Event Report</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Narrative Report</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Attendance Sheet</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Photos/Documentation</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Financial Liquidation</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Official Receipts (if applicable)</Text></View>
-              <View style={ds.checklistItem}><Feather name="check-square" size={14} color={colors.success} /><Text style={ds.checklistTxt}>Event Summary</Text></View>
+              <Text style={ds.checklistTitle}>Please submit the following requirements as a single merged PDF or ZIP archive after your event:</Text>
+              {['Post-Event Report', 'Narrative Report', 'Attendance Sheet', 'Photos/Documentation', 'Financial Liquidation', 'Official Receipts (if applicable)', 'Event Summary'].map(item => (
+                <View key={item} style={ds.checklistItem}>
+                  <Feather name="check-square" size={14} color={colors.success} />
+                  <Text style={ds.checklistTxt}>{item}</Text>
+                </View>
+              ))}
             </View>
-
-            <TouchableOpacity 
-              style={[ds.editCta, { backgroundColor: colors.brand, marginBottom: 20 }]} 
+            <TouchableOpacity
+              style={[ds.editCta, { backgroundColor: colors.brand, marginBottom: 20 }]}
               activeOpacity={0.8}
               onPress={async () => {
                 try {
@@ -289,7 +369,7 @@ export default function EventDetailsScreen({ navigation, route }) {
                     Alert.alert('Success', 'Post-Event requirements uploaded successfully!');
                     loadDetails();
                   }
-                } catch(e) {
+                } catch (e) {
                   Alert.alert('Upload Failed', e.message);
                 }
               }}
@@ -311,50 +391,39 @@ const getStyles = (colors, isDark) => StyleSheet.create({
     paddingTop: 54, paddingBottom: 16, paddingHorizontal: 20,
     backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderBottomLeftRadius: 30, borderBottomRightRadius: 30,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 3,
-    zIndex: 10
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 3, zIndex: 10
   },
-  headerTitle: { fontFamily: 'Poppins_700Bold', fontSize: 18, color: colors.text, flex: 1, textAlign: 'center' },
-  backBtn:     { padding: 4, width: 32 },
-  editBtn:     { padding: 4, width: 32, alignItems: 'flex-end' },
-
-  ownerBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, marginBottom: 16 },
+  headerTitle:    { fontFamily: 'Poppins_700Bold', fontSize: 18, color: colors.text, flex: 1, textAlign: 'center' },
+  backBtn:        { padding: 4, width: 32 },
+  editBtn:        { padding: 4, width: 32, alignItems: 'flex-end' },
+  ownerBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, marginBottom: 16 },
   ownerBannerTxt: { fontFamily: 'Poppins_600SemiBold', fontSize: 13, flex: 1 },
-
-  content: { padding: 16, paddingBottom: 48 },
-
+  content:        { padding: 16, paddingBottom: 48 },
   card: {
     backgroundColor: colors.surface, borderRadius: 16, padding: 20, marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2
   },
-  title:     { fontFamily: 'Poppins_800ExtraBold', fontSize: 20, color: colors.text },
-  badge:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, gap: 4 },
-  badgeTxt:  { fontFamily: 'Poppins_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
-  youBadge:  { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  youBadgeTxt:{ fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.5 },
-  
-  divider:  { height: 1, backgroundColor: colors.border, marginVertical: 14 },
-
+  title:        { fontFamily: 'Poppins_800ExtraBold', fontSize: 20, color: colors.text },
+  badge:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, gap: 4 },
+  badgeTxt:     { fontFamily: 'Poppins_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+  youBadge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  youBadgeTxt:  { fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.5 },
+  divider:      { height: 1, backgroundColor: colors.border, marginVertical: 14 },
   sectionTitle: { fontFamily: 'Poppins_700Bold', fontSize: 16, color: colors.text, marginBottom: 12, marginLeft: 4 },
   descTxt:      { fontFamily: 'Poppins_400Regular', fontSize: 14, color: colors.text, lineHeight: 22 },
-
   halfCard: {
     flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 24,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2
   },
-  halfVal: { fontFamily: 'Poppins_700Bold', fontSize: 16, color: colors.text },
-  halfLbl: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: colors.textMuted },
-
+  halfVal:        { fontFamily: 'Poppins_700Bold', fontSize: 16, color: colors.text },
+  halfLbl:        { fontFamily: 'Poppins_500Medium', fontSize: 12, color: colors.textMuted },
   avatarSmall:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarSmallTxt: { fontFamily: 'Poppins_800ExtraBold', fontSize: 16, color: '#FFF' },
-
-  iconBox: { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  
-  checklistCard: { borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1 },
-  checklistTitle:{ fontFamily: 'Poppins_500Medium', fontSize: 12, color: colors.text, marginBottom: 8 },
-  checklistItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  checklistTxt:  { fontFamily: 'Poppins_400Regular', fontSize: 12, color: colors.textMuted },
-
+  iconBox:        { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  checklistCard:  { borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1 },
+  checklistTitle: { fontFamily: 'Poppins_500Medium', fontSize: 12, color: colors.text, marginBottom: 8 },
+  checklistItem:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  checklistTxt:   { fontFamily: 'Poppins_400Regular', fontSize: 12, color: colors.textMuted },
   editCta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 30, paddingVertical: 16, marginTop: 8,

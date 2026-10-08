@@ -171,16 +171,26 @@ export default function AdminLogin() {
         );
       }
 
-      // Verify admin role explicitly so we can catch errors and show them to the user.
+      // Verify role — PGRST116/406 means no row in public.users yet
+      const ALLOWED_ROLES = ['admin', 'superadmin', 'osas_admin', 'gso', 'pso', 'supply', 'venue', 'admin_assistant', 'osas_staff'];
+
       const { data: roleData, error: roleError } = await supabase
         .from('users')
         .select('role')
         .eq('id', authData.user.id)
         .single();
 
-      if (roleError || !['admin', 'superadmin', 'osas_admin'].includes(roleData?.role)) {
+      if (roleError && roleError.code !== 'PGRST116' && roleError.status !== 406) {
         await supabase.auth.signOut();
-        throw new Error('Access denied. You do not have admin privileges.');
+        throw new Error('Could not verify your account role. Please try again.');
+      }
+
+      if (!roleData || !ALLOWED_ROLES.includes(roleData?.role)) {
+        await supabase.auth.signOut();
+        if (!roleData) {
+          throw new Error('Your account profile has not been set up yet. Please contact OSAS Admin to assign your role.');
+        }
+        throw new Error('Access denied. Your account does not have dashboard access. Please contact OSAS Admin.');
       }
 
       rateLimiter.recordSuccess(email);

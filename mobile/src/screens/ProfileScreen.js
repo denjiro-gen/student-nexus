@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView, Image,
   TouchableOpacity, RefreshControl,
-  Alert, StatusBar, Animated, Modal, TextInput, KeyboardAvoidingView, Platform,
+  Alert, StatusBar, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { portfolioAPI, userAPI, eventAPI } from '../services/api';
 import { supabase } from '../config/supabase';
 import { useTheme } from '../context/ThemeContext';
+import * as ImagePicker from 'expo-image-picker';
 
 function InfoRow({ icon, label, value, last, colors }) {
   return (
@@ -66,21 +67,23 @@ export default function ProfileScreen({ navigation }) {
   const s = getStyles(colors, isDark);
   const { user, userProfile, signOut } = useAuth();
   
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({ portfolioCount: 0, orgCount: 0, eventsCount: 0 });
-  const [myOrgs, setMyOrgs] = useState([]);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [stats, setStats]             = useState({ portfolioCount: 0, orgCount: 0, eventsCount: 0 });
+  const [myOrgs, setMyOrgs]           = useState([]);
+  const [avatarUri, setAvatarUri]     = useState(null);  // local override after upload
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   // Edit Profile / Password State
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [isAppearanceVisible, setIsAppearanceVisible] = useState(false);
-  const [editName, setEditName] = useState('');
+  const [editName, setEditName]       = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving]       = useState(false);
 
   useEffect(() => {
-    if (userProfile) setEditName(userProfile.full_name);
+    if (userProfile) setEditName(userProfile.full_name || '');
   }, [userProfile]);
 
   useEffect(() => {
@@ -110,6 +113,50 @@ export default function ProfileScreen({ navigation }) {
 
   const onRefresh = async () => { setRefreshing(true); await loadStats(); setRefreshing(false); };
 
+  // ── Profile Picture Upload ───────────────────────────────────────────────
+  const handlePickAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow photo library access to change your profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.75,
+      });
+
+      if (!result.canceled && result.assets?.length > 0) {
+        const asset  = result.assets[0];
+        const userId = userProfile?.user_id || userProfile?.id || user?.id;
+        if (!userId) return;
+
+        setUploadingAvatar(true);
+        // Extract filename and mime from URI
+        const uriParts = asset.uri.split('.');
+        const ext      = (uriParts[uriParts.length - 1] || 'jpg').toLowerCase();
+        const mime     = ext === 'png' ? 'image/png' : 'image/jpeg';
+        const fileName = `avatar.${ext}`;
+
+        const { publicUrl, error } = await userAPI.uploadProfilePicture(userId, asset.uri, fileName, mime);
+
+        if (error) {
+          Alert.alert('Upload Failed', error.message || 'Could not upload profile picture.');
+        } else {
+          setAvatarUri(publicUrl);   // immediately reflect change in UI
+          Alert.alert('✅ Updated', 'Your profile picture has been updated successfully!');
+        }
+        setUploadingAvatar(false);
+      }
+    } catch (err) {
+      setUploadingAvatar(false);
+      Alert.alert('Error', err.message || 'Failed to pick image.');
+    }
+  };
+
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -130,7 +177,7 @@ export default function ProfileScreen({ navigation }) {
     } else {
       Alert.alert('Success', 'Profile updated successfully.');
       setIsEditProfileVisible(false);
-      onRefresh(); // reload data
+      onRefresh();
     }
   };
 
@@ -155,6 +202,9 @@ export default function ProfileScreen({ navigation }) {
   const initial     = displayName.charAt(0).toUpperCase();
   const displayRole = myOrgs[0]?.position || userProfile?.role?.replace(/_/g, ' ') || 'student';
 
+  // Resolve avatar: local override > db profile_picture_url > null (initials)
+  const profilePicUrl = avatarUri || userProfile?.profile_picture_url || null;
+
   const joinedDate = userProfile?.created_at
     ? new Date(userProfile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     : null;
@@ -171,11 +221,29 @@ export default function ProfileScreen({ navigation }) {
           <View style={s.ring1} />
           <View style={s.ring2} />
 
-          <View style={s.avatarOuter}>
-            <View style={s.avatarInner}>
-              <Text style={s.avatarTxt}>{initial}</Text>
+          {/* Tappable Avatar with upload overlay */}
+          <TouchableOpacity
+            style={s.avatarOuter}
+            onPress={handlePickAvatar}
+            activeOpacity={0.8}
+            disabled={uploadingAvatar}
+          >
+            {profilePicUrl ? (
+              <Image source={{ uri: profilePicUrl }} style={s.avatarImage} />
+            ) : (
+              <View style={s.avatarInner}>
+                <Text style={s.avatarTxt}>{initial}</Text>
+              </View>
+            )}
+
+            {/* Upload overlay */}
+            <View style={s.avatarEditBadge}>
+              {uploadingAvatar
+                ? <ActivityIndicator size="small" color="#FFF" />
+                : <Feather name="camera" size={13} color="#FFF" />
+              }
             </View>
-          </View>
+          </TouchableOpacity>
 
           <Text style={s.name}>{displayName}</Text>
           <Text style={s.email}>{user?.email || '—'}</Text>
@@ -192,6 +260,11 @@ export default function ProfileScreen({ navigation }) {
               </View>
             )}
           </View>
+
+          <TouchableOpacity style={s.changePicBtn} onPress={handlePickAvatar} disabled={uploadingAvatar} activeOpacity={0.8}>
+            <Feather name="upload" size={11} color="rgba(255,255,255,0.9)" />
+            <Text style={s.changePicTxt}>{uploadingAvatar ? 'Uploading...' : 'Change Photo'}</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         <View style={s.statsRow}>
@@ -257,6 +330,14 @@ export default function ProfileScreen({ navigation }) {
             icon="moon"
             label="Appearance"
             onPress={() => setIsAppearanceVisible(true)}
+          />
+          <ActionRow
+            colors={colors}
+            icon="camera"
+            label="Change Profile Picture"
+            onPress={handlePickAvatar}
+            iconColor="#F59E0B"
+            bg={isDark ? 'rgba(245,158,11,0.15)' : '#FEF3C7'}
           />
           <ActionRow
             colors={colors}
@@ -346,10 +427,9 @@ export default function ProfileScreen({ navigation }) {
                 <Feather name="x" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
             {['system', 'light', 'dark'].map((m) => (
-              <TouchableOpacity 
-                key={m} 
+              <TouchableOpacity
+                key={m}
                 style={[s.themeOption, mode === m && s.themeOptionSelected]}
                 onPress={() => { changeThemeMode(m); setIsAppearanceVisible(false); }}
               >
@@ -378,9 +458,22 @@ const getStyles = (colors, isDark) => StyleSheet.create({
   },
   ring1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', top: -60, right: -50 },
   ring2: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', bottom: 10, left: -30 },
-  avatarOuter: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: 'rgba(255,255,255,0.38)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  avatarInner: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
-  avatarTxt:   { fontFamily: 'Poppins_800ExtraBold', fontSize: 32, color: colors.brand },
+
+  // Avatar with photo support
+  avatarOuter:     { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: 'rgba(255,255,255,0.38)', alignItems: 'center', justifyContent: 'center', marginBottom: 14, position: 'relative' },
+  avatarInner:     { width: 82, height: 82, borderRadius: 41, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:       { fontFamily: 'Poppins_800ExtraBold', fontSize: 32, color: colors.brand },
+  avatarImage:     { width: 90, height: 90, borderRadius: 45 },
+  avatarEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: colors.brand,
+    borderWidth: 2, borderColor: '#FFF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  changePicBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)' },
+  changePicTxt:    { fontFamily: 'Poppins_500Medium', fontSize: 11, color: 'rgba(255,255,255,0.9)' },
+
   name:  { fontFamily: 'Poppins_800ExtraBold', fontSize: 22, color: '#FFF', marginBottom: 4 },
   email: { fontFamily: 'Poppins_400Regular',   fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 14 },
   badgeRow:  { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
@@ -400,16 +493,16 @@ const getStyles = (colors, isDark) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, marginBottom: 22 },
   version: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 20 },
   
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontFamily: 'Poppins_700Bold', fontSize: 18, color: colors.text },
-  inputLabel: { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: colors.text, marginBottom: 8 },
-  textInput: { backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontFamily: 'Poppins_400Regular', fontSize: 14, color: colors.text, marginBottom: 24 },
-  saveBtn: { backgroundColor: colors.brand, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  saveBtnTxt: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#FFF' },
+  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent:  { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  modalHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  modalTitle:    { fontFamily: 'Poppins_700Bold', fontSize: 18, color: colors.text },
+  inputLabel:    { fontFamily: 'Poppins_600SemiBold', fontSize: 12, color: colors.text, marginBottom: 8 },
+  textInput:     { backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontFamily: 'Poppins_400Regular', fontSize: 14, color: colors.text, marginBottom: 24 },
+  saveBtn:       { backgroundColor: colors.brand, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  saveBtnTxt:    { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#FFF' },
 
-  themeOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12, marginBottom: 8, backgroundColor: colors.background },
+  themeOption:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12, marginBottom: 8, backgroundColor: colors.background },
   themeOptionSelected: { backgroundColor: colors.brandLight, borderWidth: 1, borderColor: colors.brand },
-  themeOptionTxt: { flex: 1, fontFamily: 'Poppins_600SemiBold', fontSize: 14, color: colors.text, marginLeft: 12 },
+  themeOptionTxt:      { flex: 1, fontFamily: 'Poppins_600SemiBold', fontSize: 14, color: colors.text, marginLeft: 12 },
 });

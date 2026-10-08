@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
 import ReactMarkdown from 'react-markdown';
 import { Search, Plus, Paperclip, Sparkles, Send, User, Clock, Loader, Bot, Calendar, FileText, CheckCircle2, XCircle, Users, Trash2 } from 'lucide-react';
-import { adminAPI } from '../../services/api';
-import { saveSession, getSessionHistory, AIAssistantSession, deleteSession, deleteAllSessions } from '../../services/aiService';
+import { getSessionHistory, AIAssistantSession, deleteSession, deleteAllSessions } from '../../services/aiService';
 import { format } from 'date-fns';
 
 const GlobalBlink = createGlobalStyle`

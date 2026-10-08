@@ -23,31 +23,9 @@ export const authAPI = {
   getCurrentUser: async () => { const { data, error } = await supabase.auth.getUser(); return { data, error }; },
 };
 
-export const facultyAPI = {
-  createRequest: async (userId, title, description, documentUrl) => {
-    const { data, error } = await supabase
-      .from('faculty_requests')
-      .insert({
-        user_id: userId,
-        title,
-        description,
-        document_url: documentUrl,
-        status: 'pending',
-      })
-      .select()
-      .single();
-    return { data, error };
-  },
 
-  getRequests: async (userId) => {
-    const { data, error } = await supabase
-      .from('faculty_requests')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    return { data, error };
-  }
-};
+
+
 
 export const userAPI = {
   getProfile: async (userId) => {
@@ -72,6 +50,47 @@ export const userAPI = {
       .select('id, email, full_name, role, student_id, contact_number, profile_picture_url')
       .maybeSingle();
     return { data, error };
+  },
+
+  // Upload and set profile picture
+  uploadProfilePicture: async (userId, fileUri, fileName, mimeType) => {
+    try {
+      const ext = (fileName.split('.').pop() || 'jpg').toLowerCase();
+      const mime = mimeType || (
+        ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
+        ext === 'png' ? 'image/png' :
+        'image/jpeg'
+      );
+      // Always overwrite the same path so the URL is stable
+      const folderPath = `${userId}/avatar.${ext}`;
+      const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: 'base64' });
+      const arrayBuffer = decode(base64);
+
+      const { error: storageErr } = await supabase.storage
+        .from('profile-pictures')
+        .upload(folderPath, arrayBuffer, { contentType: mime, upsert: true });
+
+      if (storageErr) throw storageErr;
+
+      const { data: urlData } = supabase.storage
+        .from('profile-pictures')
+        .getPublicUrl(folderPath);
+
+      // Add cache-busting query param so the image refreshes immediately
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { data, error } = await supabase
+        .from('users')
+        .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select('id, profile_picture_url')
+        .maybeSingle();
+
+      return { publicUrl, data, error };
+    } catch (error) {
+      console.warn('uploadProfilePicture error:', error);
+      return { publicUrl: null, data: null, error };
+    }
   },
 
   getAllUsers: async () => {
@@ -137,6 +156,33 @@ export const eventAPI = {
       `)
       .order('event_date', { ascending: false });
     return { data: data?.map(e => ({ ...e, proposal_id: e.id })) || [], error };
+  },
+
+  // Get all events for the calendar view (approved + pending + completed)
+  getCalendarEvents: async () => {
+    const { data, error } = await supabase
+      .from('event_proposals')
+      .select(`
+        id, title, description, event_date, event_time_start, event_time_end,
+        venue, status, expected_attendees, created_at,
+        organization:organizations(id, name, acronym)
+      `)
+      .in('status', ['approved', 'pending', 'completed'])
+      .order('event_date', { ascending: true });
+    return { data: data?.map(e => ({ ...e, proposal_id: e.id })) || [], error };
+  },
+
+  // Get full approval/action history for an event
+  getApprovalHistory: async (eventId) => {
+    const { data, error } = await supabase
+      .from('event_approval_logs')
+      .select(`
+        id, office_name, status, remarks, actioned_at,
+        action_by:users!event_approval_logs_action_by_user_id_fkey(full_name, office_name)
+      `)
+      .eq('event_id', eventId)
+      .order('actioned_at', { ascending: true });
+    return { data: data || [], error };
   },
 
   getEventById: async (eventId) => {
@@ -790,7 +836,7 @@ export const orgAPI = {
   },
 
 
-  submitComplianceDocument: async (orgId, requirementId, fileUri, fileName, mimeType) => {
+  submitComplianceDocument: async (orgId, requirementId, fileUri, fileName, mimeType, userId = null) => {
     try {
       const ext = (fileName.split('.').pop() || 'pdf').toLowerCase();
       const mime = mimeType || (
@@ -805,12 +851,9 @@ export const orgAPI = {
       const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: 'base64' });
       const arrayBuffer = decode(base64);
 
-      const { data: storageData, error: storageError } = await supabase.storage
+      const { error: storageError } = await supabase.storage
         .from('compliance_documents')
-        .upload(folderPath, arrayBuffer, {
-          contentType: mime,
-          upsert: true,
-        });
+        .upload(folderPath, arrayBuffer, { contentType: mime, upsert: true });
 
       if (storageError) throw storageError;
 
@@ -819,42 +862,156 @@ export const orgAPI = {
         .getPublicUrl(folderPath);
         
       const documentUrl = publicUrlData.publicUrl;
+      const now = new Date().toISOString();
 
-      // Check if a record already exists
+      // Get uploader's name for version history
+      let uploaderName = 'Officer';
+      if (userId) {
+        const { data: uData } = await supabase.from('users').select('full_name').eq('id', userId).maybeSingle();
+        if (uData?.full_name) uploaderName = uData.full_name;
+      }
+
+      // Check if a record already exists for this org + requirement
       const { data: existing } = await supabase
         .from('organization_compliance')
-        .select('id')
+        .select('id, version_history, document_url')
         .eq('organization_id', orgId)
         .eq('requirement_id', requirementId)
         .maybeSingle();
 
       if (existing) {
-        // Update
+        // --- UPDATE existing record ---
+        // Build version history: append old entry, keep full trail
+        const oldHistory = Array.isArray(existing.version_history) ? existing.version_history : [];
+        const versionNum = oldHistory.length + 1;
+        const newEntry = {
+          version:         versionNum,
+          action:          'update',
+          uploaded_by_id:  userId,
+          uploaded_by_name: uploaderName,
+          document_url:    documentUrl,
+          actioned_at:     now,
+        };
+        const updatedHistory = [...oldHistory, newEntry];
+
         const { error } = await supabase
           .from('organization_compliance')
           .update({ 
-            status: 'pending', 
-            document_url: documentUrl,
-            updated_at: new Date().toISOString()
+            status:          'pending', 
+            document_url:    documentUrl,
+            updated_by:      userId,
+            updated_at:      now,
+            version_history: updatedHistory,
           })
           .eq('id', existing.id);
+
+        // Notify admins of the update
+        if (!error) {
+          try {
+            const { data: req } = await supabase
+              .from('compliance_requirements')
+              .select('name, category')
+              .eq('id', requirementId)
+              .maybeSingle();
+            const { data: org } = await supabase
+              .from('organizations')
+              .select('name')
+              .eq('id', orgId)
+              .maybeSingle();
+            const category = req?.category || 'compliance';
+            const reqName  = req?.name || 'document';
+            const orgName  = org?.name || 'an organization';
+
+            // Notify all admins
+            const { data: admins } = await supabase
+              .from('users').select('id').in('role', ['osas_admin', 'admin']);
+            const title   = `${orgName} updated their ${category} document`;
+            const message = `${uploaderName} from ${orgName} uploaded a new version of "${reqName}". Version ${versionNum} — ${new Date(now).toLocaleString()}`;
+            const adminNotifs = (admins || []).map(a => ({
+              user_id: a.id, title, message, type: 'compliance_update', is_read: false
+            }));
+            if (adminNotifs.length > 0) await supabase.from('notifications').insert(adminNotifs);
+
+            // Also notify other active officers of the same org (except submitter)
+            const { data: members } = await supabase
+              .from('organization_members')
+              .select('user_id')
+              .eq('organization_id', orgId)
+              .eq('is_active', true);
+            const officerNotifs = (members || [])
+              .filter(m => m.user_id !== userId)
+              .map(m => ({ user_id: m.user_id, title: `${category} document updated`, message, type: 'compliance_update', is_read: false }));
+            if (officerNotifs.length > 0) await supabase.from('notifications').insert(officerNotifs);
+          } catch (notifErr) {
+            console.warn('Compliance update notify error (non-fatal):', notifErr);
+          }
+        }
+
         return { error };
       } else {
-        // Insert
+        // --- INSERT new record ---
+        const initialHistory = [{
+          version:          1,
+          action:           'upload',
+          uploaded_by_id:   userId,
+          uploaded_by_name: uploaderName,
+          document_url:     documentUrl,
+          actioned_at:      now,
+        }];
+
         const { error } = await supabase
           .from('organization_compliance')
           .insert({
-            organization_id: orgId,
-            requirement_id: requirementId,
-            status: 'pending',
-            document_url: documentUrl
+            organization_id:  orgId,
+            requirement_id:   requirementId,
+            status:           'pending',
+            document_url:     documentUrl,
+            uploaded_by:      userId,
+            version_history:  initialHistory,
+            created_at:       now,
+            updated_at:       now,
           });
+
+        // Notify admins of the new submission
+        if (!error) {
+          try {
+            const { data: req } = await supabase
+              .from('compliance_requirements').select('name, category').eq('id', requirementId).maybeSingle();
+            const { data: org } = await supabase
+              .from('organizations').select('name').eq('id', orgId).maybeSingle();
+            const category = req?.category || 'compliance';
+            const reqName  = req?.name || 'document';
+            const orgName  = org?.name || 'an organization';
+
+            const { data: admins } = await supabase
+              .from('users').select('id').in('role', ['osas_admin', 'admin']);
+            const title   = `${orgName} submitted a new ${category} document`;
+            const message = `${uploaderName} from ${orgName} submitted "${reqName}" for review.`;
+            const adminNotifs = (admins || []).map(a => ({
+              user_id: a.id, title, message, type: 'compliance_update', is_read: false
+            }));
+            if (adminNotifs.length > 0) await supabase.from('notifications').insert(adminNotifs);
+          } catch (notifErr) {
+            console.warn('Compliance submit notify error (non-fatal):', notifErr);
+          }
+        }
+
         return { error };
       }
     } catch (error) {
       console.warn('submitComplianceDocument error:', error);
       return { error };
     }
+  },
+
+  // Return version history for a compliance record
+  getComplianceVersionHistory: async (recordId) => {
+    const { data, error } = await supabase
+      .from('organization_compliance')
+      .select('version_history, created_at, updated_at, uploaded_by, updated_by')
+      .eq('id', recordId)
+      .maybeSingle();
+    return { data, error };
   },
 
   getRepositoryDocuments: async (orgId) => {

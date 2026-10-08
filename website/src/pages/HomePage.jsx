@@ -5,6 +5,7 @@ import OrganizationsSection from '../components/OrganizationsSection';
 import Announcements from '../components/Announcements';
 import Staff from '../components/Staff';
 import Contact from '../components/Contact';
+import CalendarSection from '../components/CalendarSection';
 
 const HomePage = () => {
   return (
@@ -13,6 +14,7 @@ const HomePage = () => {
       <WelcomeSection />
       <OrganizationsSection />
       <Announcements />
+      <CalendarSection />
       <Staff />
       <Contact />
     </div>

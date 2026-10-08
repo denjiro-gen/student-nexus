@@ -14,12 +14,17 @@ import AdminCalendar from './pages/admin/AdminCalendar';
 import AdminCommunications from './pages/admin/AdminCommunications';
 import AdminMessages from './pages/admin/AdminMessages';
 import AdminRepository from './pages/admin/AdminRepository';
-import AdminFacultyRequests from './pages/admin/AdminFacultyRequests';
 import AdminAnnouncements from './pages/admin/AdminAnnouncements';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import AdminLogin from './pages/AdminLogin';
+import OfficeDashboard from './pages/admin/OfficeDashboard';
+import GSODashboard from './pages/office/GSODashboard';
+import VenueDashboard from './pages/office/VenueDashboard';
+import SupplyDashboard from './pages/office/SupplyDashboard';
+import PSODashboard from './pages/office/PSODashboard';
 
-const ADMIN_ROLES = ['admin', 'superadmin', 'osas_admin'];
+const ADMIN_ROLES  = ['admin', 'superadmin', 'osas_admin', 'gso', 'pso', 'supply', 'venue', 'admin_assistant', 'osas_staff'];
+const OFFICE_ROLES = ['gso', 'pso', 'supply', 'venue', 'admin_assistant'];
 
 // ─── Auth Gate ────────────────────────────────────────────────────────────────
 // Handles session checking at the App level — single source of truth.
@@ -68,8 +73,30 @@ function AuthGate({ children }) {
     };
   }, []);
 
-  if (status === 'loading') return null; // blank screen while verifying — no blink
-  return children(status === 'authed');
+  if (status === 'loading') return null;
+  return children(status === 'authed', status === 'office');
+}
+
+function RoleDashboard() {
+  const [role, setRole] = React.useState(null);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import('./config/supabase');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase.from('users').select('role').eq('id', user.id).single();
+        setRole(data?.role || 'admin');
+      } catch { setRole('admin'); }
+    })();
+  }, []);
+  if (role === null) return null;
+  if (role === 'gso') return <GSODashboard />;
+  if (role === 'venue') return <VenueDashboard />;
+  if (role === 'supply') return <SupplyDashboard />;
+  if (role === 'pso') return <PSODashboard />;
+  if (OFFICE_ROLES.includes(role)) return <OfficeDashboard />; // admin_assistant fallback
+  return <AdminDashboard />;
 }
 
 function App() {
@@ -91,7 +118,7 @@ function App() {
             {/* Protected admin routes */}
             {isAuthed ? (
               <Route element={<AdminLayout />}>
-                <Route path="/dashboard" element={<AdminDashboard />} />
+                <Route path="/dashboard" element={<RoleDashboard />} />
                 <Route path="/kanban" element={<AdminKanban />} />
                 <Route path="/register" element={<InstitutionalRegister />} />
                 <Route path="/calendar" element={<AdminCalendar />} />
@@ -104,7 +131,6 @@ function App() {
                 <Route path="/compliance" element={<AdminCompliance />} />
                 <Route path="/repository" element={<AdminRepository />} />
                 <Route path="/reports" element={<AdminReports />} />
-                <Route path="/faculty-requests" element={<AdminFacultyRequests />} />
                 <Route path="/contact-messages" element={<AdminContactMessages />} />
               </Route>
             ) : (

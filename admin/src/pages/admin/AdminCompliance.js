@@ -218,6 +218,9 @@ export default function AdminCompliance() {
   const [activeSemester, setActiveSemester] = useState(null);
   const [allSemesters,   setAllSemesters]   = useState([]);
 
+  // Category tabs: 'all' | 'accreditation' | 'clearance'
+  const [activeCategory, setActiveCategory] = useState('all');
+
   // Approve/reject modal
   const [modal,    setModal]    = useState({ open: false, type: '', item: null });
   const [notes,    setNotes]    = useState('');
@@ -231,9 +234,12 @@ export default function AdminCompliance() {
   const [semModal,  setSemModal]  = useState(false);
   const [semTab,    setSemTab]    = useState('semesters'); // 'semesters' | 'requirements'
   const [newSem,    setNewSem]    = useState({ name: '', start_date: '', end_date: '' });
-  const [newReq,    setNewReq]    = useState({ name: '', description: '', deadline_type: 'semester' });
+  const [newReq,    setNewReq]    = useState({ name: '', description: '', deadline_type: 'semester', category: 'accreditation' });
   const [semSaving, setSemSaving] = useState(false);
   const [reqSaving, setReqSaving] = useState(false);
+
+  // Version history modal
+  const [vhModal,   setVhModal]   = useState({ open: false, item: null });
 
   /* ─── Load ─── */
   const load = useCallback(async () => {
@@ -288,10 +294,19 @@ export default function AdminCompliance() {
   });
 
   const processedOrgs = Array.from(orgsMap.values()).map(org => {
-    const TOTAL = reqs.length || 14;
-    const compliantCount = org.items.filter(it => it.status === 'compliant' || it.status === 'approved').length;
+    // Filter items by active category if set
+    const categoryItems = activeCategory === 'all'
+      ? org.items
+      : org.items.filter(it => (it.requirement?.category || 'accreditation') === activeCategory);
+
+    const categoryReqs = activeCategory === 'all'
+      ? reqs
+      : reqs.filter(r => (r.category || 'accreditation') === activeCategory);
+
+    const TOTAL = categoryReqs.length || 14;
+    const compliantCount = categoryItems.filter(it => it.status === 'compliant' || it.status === 'approved').length;
     const percentage = TOTAL === 0 ? 0 : Math.min(100, Math.round((compliantCount / TOTAL) * 100));
-    return { ...org, submittedCount: org.items.length, compliantCount, total: TOTAL, percentage };
+    return { ...org, items: categoryItems, submittedCount: categoryItems.length, compliantCount, total: TOTAL, percentage };
   });
 
   const visibleOrgs = processedOrgs.filter(org => {
@@ -373,10 +388,11 @@ export default function AdminCompliance() {
       description: newReq.description,
       deadline_type: newReq.deadline_type,
       semester_id: activeSemester.id,
+      category: newReq.category || 'accreditation',
     });
     setReqSaving(false);
     if (!error) {
-      setNewReq({ name: '', description: '', deadline_type: 'semester' });
+      setNewReq({ name: '', description: '', deadline_type: 'semester', category: 'accreditation' });
       load();
     } else alert('Failed to add requirement: ' + error.message);
   };
@@ -430,6 +446,28 @@ export default function AdminCompliance() {
           </Btn>
         </div>
       </SemesterBar>
+
+      {/* Category Tabs */}
+      <div style={{ display: 'flex', gap: 24, padding: '0 8px', marginBottom: 20, borderBottom: '1px solid #e5e7eb' }}>
+        {[
+          { id: 'all', label: 'All Requirements' },
+          { id: 'accreditation', label: 'Accreditation' },
+          { id: 'clearance', label: 'Clearance' }
+        ].map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            style={{
+              padding: '0 0 12px 0', border: 'none', background: 'none', cursor: 'pointer',
+              fontWeight: 600, fontSize: 14,
+              color: activeCategory === cat.id ? GREEN : '#6b7280',
+              borderBottom: activeCategory === cat.id ? `2px solid ${GREEN}` : '2px solid transparent',
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
       {/* Main Compliance Table */}
       <Card>
@@ -565,6 +603,11 @@ export default function AdminCompliance() {
                                               </span>
                                             ) : (
                                               <span style={{ fontSize: 11, color: '#d1d5db' }}>—</span>
+                                            )}
+                                            {item && item.version_history && item.version_history.length > 0 && (
+                                              <IconBtn title="Version History" onClick={e => { e.stopPropagation(); setVhModal({ open: true, item }); }}>
+                                                <RotateCcw size={14} />
+                                              </IconBtn>
                                             )}
                                             {item && (
                                               <IconBtn $danger title="Delete" onClick={e => { e.stopPropagation(); confirmDelete(item.id); }}>
@@ -725,6 +768,13 @@ export default function AdminCompliance() {
                           />
                         </InputWrap>
                         <InputWrap>
+                          <label>Category</label>
+                          <select value={newReq.category} onChange={e => setNewReq(p => ({ ...p, category: e.target.value }))}>
+                            <option value="accreditation">Accreditation</option>
+                            <option value="clearance">Clearance</option>
+                          </select>
+                        </InputWrap>
+                        <InputWrap>
                           <label>Deadline Type</label>
                           <select value={newReq.deadline_type} onChange={e => setNewReq(p => ({ ...p, deadline_type: e.target.value }))}>
                             <option value="semester">End of Semester</option>
@@ -843,6 +893,53 @@ export default function AdminCompliance() {
                 {deleting ? <SpinIcon size={14} /> : <Trash2 size={14} />}
                 {deleting ? 'Deleting…' : 'Delete'}
               </Btn>
+            </MFoot>
+          </ModalBox>
+        </Overlay>
+      )}
+
+      {/* ─ Version History Modal ─ */}
+      {vhModal.open && vhModal.item && (
+        <Overlay onClick={e => e.target === e.currentTarget && setVhModal({ open: false, item: null })}>
+          <ModalBox>
+            <MHead>
+              <div className="left">
+                <RotateCcw color={GREEN} size={20} />
+                <h3>Version History</h3>
+              </div>
+              <button onClick={() => setVhModal({ open: false, item: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+                <X size={20} />
+              </button>
+            </MHead>
+            <MBody>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{vhModal.item.requirement?.name}</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>{vhModal.item.organization?.name}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[...(vhModal.item.version_history || [])].reverse().map((v, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', background: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: i === 0 ? GREEN : '#9ca3af', marginTop: 6 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>Version {v.version}</span>
+                        <span style={{ fontSize: 11, color: '#6b7280' }}>
+                          {new Date(v.actioned_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#374151' }}>
+                        Action: <span style={{ fontWeight: 600 }}>{v.action === 'upload' ? 'Initial Upload' : 'Updated'}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                        By: {v.uploaded_by_name || 'Student Officer'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </MBody>
+            <MFoot>
+              <Btn $ghost onClick={() => setVhModal({ open: false, item: null })}>Close</Btn>
             </MFoot>
           </ModalBox>
         </Overlay>

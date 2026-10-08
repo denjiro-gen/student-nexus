@@ -107,9 +107,19 @@ const WelcomeSection = () => {
               ))}
             </div>
 
-            <button className="btn-primary">
-              Discover Our Mission
-            </button>
+            <div className="flex items-center gap-4 flex-wrap">
+              <button className="btn-primary">
+                Discover Our Mission
+              </button>
+              <a
+                href="http://localhost:5174"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-outline"
+              >
+                Submit Online →
+              </a>
+            </div>
           </motion.div>
 
         </div>

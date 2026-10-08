@@ -24,7 +24,7 @@ function NotifItem({ item, onPress, onMarkRead, colors, isDark }) {
 
   const TYPE_ICON = {
     event_approval: { icon: 'calendar',       color: colors.success },
-    faculty_request:{ icon: 'package',        color: colors.warning },
+
     compliance_update:{ icon: 'shield',       color: colors.info },
     event_submission:{ icon: 'file-plus',     color: colors.brand },
     system:         { icon: 'bell',           color: colors.brand },

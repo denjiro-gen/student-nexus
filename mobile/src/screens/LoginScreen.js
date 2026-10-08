@@ -114,8 +114,13 @@ export default function LoginScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      const { error } = await signIn(email, password);
-      if (error) Alert.alert('Login Failed', error.message);
+      const result = await signIn(email, password);
+      if (!result.success) {
+        // result.error is already a plain string from AuthContext
+        const msg = result.error || 'Login failed. Please check your credentials.';
+        Alert.alert('Login Failed', msg);
+      }
+      // On success, AuthContext onAuthStateChange handles navigation automatically
     } catch (e) {
       Alert.alert('Error', e.message || 'An unexpected error occurred.');
     } finally {

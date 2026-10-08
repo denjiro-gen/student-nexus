@@ -34,10 +34,8 @@ import EventDetailsScreen from './src/screens/EventDetailsScreen';
 import CreateEventScreen from './src/screens/CreateEventScreen';
 import UploadAchievementScreen from './src/screens/UploadAchievementScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
-import FacultyHomeScreen from './src/screens/FacultyHomeScreen';
-import CreateFacultyRequestScreen from './src/screens/CreateFacultyRequestScreen';
-import FacultyRequestDetailsScreen from './src/screens/FacultyRequestDetailsScreen';
 import RepositoryScreen from './src/screens/RepositoryScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
 import UpdatePopup from './src/components/UpdatePopup';
 import CustomTabBar from './src/components/CustomTabBar';
 
@@ -141,6 +139,14 @@ function MainTabs() {
         component={EventsScreen}
         options={{
           tabBarLabel: 'Events',
+          tabBarIcon: ({ color, size }) => <Feather name="layout" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Calendar"
+        component={CalendarScreen}
+        options={{
+          tabBarLabel: 'Calendar',
           tabBarIcon: ({ color, size }) => <Feather name="calendar" size={size} color={color} />,
         }}
       />
@@ -205,25 +211,14 @@ function MainStack() {
       <Stack.Screen name="Portfolio" component={PortfolioScreen} />
       <Stack.Screen name="Repository" component={RepositoryScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="CalendarFull" component={CalendarScreen} />
     </Stack.Navigator>
   );
 }
 
-function FacultyStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        ...curvedSlideTransition,
-        cardStyle: { backgroundColor: '#F4F7F5' },
-      }}
-    >
-      <Stack.Screen name="FacultyHome"           component={FacultyHomeScreen} />
-      <Stack.Screen name="CreateFacultyRequest"  component={CreateFacultyRequestScreen} />
-      <Stack.Screen name="FacultyRequestDetails" component={FacultyRequestDetailsScreen} />
-    </Stack.Navigator>
-  );
-}
+
+
+
 
 function RootNavigator() {
   const { user, loading, userProfile } = useAuth();
@@ -260,11 +255,11 @@ function RootNavigator() {
     );
   }
 
-  const isFaculty = userProfile?.role === 'faculty';
+  const isFaculty = false; // Faculty Request feature removed
 
   return (
     <NavigationContainer>
-      {isFaculty ? <FacultyStack /> : <MainStack />}
+      <MainStack />
     </NavigationContainer>
   );
 }

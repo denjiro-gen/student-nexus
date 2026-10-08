@@ -152,7 +152,7 @@ export const adminAPI = {
     return { error };
   },
 
-  updateEventStatus: async (eventId, status, reviewNotes = null) => {
+  updateEventStatus: async (eventId, status, reviewNotes = null, officeName = 'OSAS') => {
     const updates = {
       status,
       updated_at: new Date().toISOString(),
@@ -171,6 +171,32 @@ export const adminAPI = {
       try {
         await adminAPI.logAction('UPDATE_EVENT_STATUS', 'event_proposal', eventId, null, { status, reviewNotes });
       } catch (logErr) { }
+
+      // ── Write to event_approval_logs for full audit trail ──
+      try {
+        const { data: { user: adminUser } } = await supabase.auth.getUser();
+        // Determine the office name: use provided officeName, or fall back to user's office_name, or 'OSAS'
+        let resolvedOfficeName = officeName;
+        if (adminUser) {
+          const { data: adminProfile } = await supabase
+            .from('users')
+            .select('office_name, role')
+            .eq('id', adminUser.id)
+            .maybeSingle();
+          if (adminProfile?.office_name) resolvedOfficeName = adminProfile.office_name;
+          else if (adminProfile?.role === 'osas_admin') resolvedOfficeName = 'OSAS';
+        }
+        await supabase.from('event_approval_logs').insert({
+          event_id:          eventId,
+          office_name:       resolvedOfficeName,
+          action_by_user_id: adminUser?.id || null,
+          status,
+          remarks:           reviewNotes || null,
+          actioned_at:       new Date().toISOString(),
+        });
+      } catch (logErr) {
+        console.warn('event_approval_logs insert failed (non-fatal):', logErr);
+      }
 
       if (data.submitted_by) {
         try {
@@ -203,6 +229,49 @@ export const adminAPI = {
     }
 
     return { data, error };
+  },
+
+  // Get full approval history for an event (multi-office trail)
+  getEventApprovalHistory: async (eventId) => {
+    const { data, error } = await supabase
+      .from('event_approval_logs')
+      .select(`
+        id, office_name, status, remarks, actioned_at,
+        action_by:users!event_approval_logs_action_by_user_id_fkey(full_name, role, office_name)
+      `)
+      .eq('event_id', eventId)
+      .order('actioned_at', { ascending: true });
+    return { data: data || [], error };
+  },
+
+  // Compliance — get list by category
+  getComplianceByCategory: async (category = null) => {
+    let query = supabase
+      .from('organization_compliance')
+      .select(`
+        *,
+        organization:organizations(name, acronym),
+        requirement:compliance_requirements(name, description, deadline_type, category),
+        uploader:users!organization_compliance_uploaded_by_fkey(full_name),
+        updater:users!organization_compliance_updated_by_fkey(full_name)
+      `)
+      .order('created_at', { ascending: false });
+    if (category) {
+      // Filter by requirement category via join
+      query = supabase
+        .from('organization_compliance')
+        .select(`
+          *,
+          organization:organizations(name, acronym),
+          requirement:compliance_requirements!inner(name, description, deadline_type, category),
+          uploader:users!organization_compliance_uploaded_by_fkey(full_name),
+          updater:users!organization_compliance_updated_by_fkey(full_name)
+        `)
+        .eq('requirement.category', category)
+        .order('created_at', { ascending: false });
+    }
+    const { data, error } = await query;
+    return { data: data || [], error };
   },
 
 
@@ -266,51 +335,54 @@ export const adminAPI = {
       .from('organization_compliance')
       .update(updatePayload)
       .eq('id', id)
-      .select('*, organization:organizations(name)')
+      .select('*, organization:organizations(name, acronym), requirement:compliance_requirements(name, category)')
       .single();
 
     if (data && !error) {
+      // Notify all active officers of the organization, not just president
+      const { data: memberRows } = await supabase
+        .from('organization_members')
+        .select('user_id')
+        .eq('organization_id', data.organization_id)
+        .eq('is_active', true);
+
       const { data: orgData } = await supabase
         .from('organizations')
         .select('president_id, advisor_id')
         .eq('id', data.organization_id)
         .single();
 
-      if (orgData) {
-        let title = 'Compliance Status Updated';
-        let msg = `Compliance requirement for ${data.organization?.name} is now marked as ${status}.`;
+      const officerIds = new Set();
+      if (orgData?.president_id) officerIds.add(orgData.president_id);
+      if (orgData?.advisor_id)   officerIds.add(orgData.advisor_id);
+      memberRows?.forEach(m => officerIds.add(m.user_id));
 
-        if (notes && notes.trim()) {
-          msg += `\n\nAdmin Message: ${notes}`;
+      const reqCategory = data.requirement?.category || 'compliance';
+      const reqName     = data.requirement?.name || 'document';
+      const orgName     = data.organization?.name || 'your organization';
+
+      let title = 'Compliance Status Updated';
+      let msg = `${orgName}'s ${reqCategory} document "${reqName}" is now marked as ${status}.`;
+      if (notes && notes.trim()) msg += `\n\nAdmin Remarks: ${notes}`;
+
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+
+      for (const recipientId of officerIds) {
+        if (adminUser && notes && notes.trim()) {
+          await adminAPI.sendMessage(adminUser.id, recipientId,
+            `Compliance Update for ${orgName} (${status}):\n${notes}`);
         }
-
-        const recipientIds = [
-          orgData.president_id,
-          orgData.advisor_id !== orgData.president_id ? orgData.advisor_id : null,
-        ].filter(Boolean);
-
-        const { data: { user: adminUser } } = await supabase.auth.getUser();
-
-        for (const recipientId of recipientIds) {
-          if (adminUser && notes && notes.trim()) {
-            await adminAPI.sendMessage(adminUser.id, recipientId, `Compliance Update for ${data.organization?.name} (${status}):\n${notes}`);
+        await adminAPI.sendNotification(recipientId, title, msg, 'compliance_update');
+        try {
+          const { data: userData } = await supabase
+            .from('users').select('expo_push_token').eq('id', recipientId).single();
+          if (userData?.expo_push_token && window.api?.sendPushNotification) {
+            await window.api.sendPushNotification(
+              userData.expo_push_token, title, msg,
+              { type: 'compliance_update', organizationId: data.organization_id }
+            );
           }
-
-          await adminAPI.sendNotification(recipientId, title, msg, 'compliance_update');
-
-          try {
-            const { data: userData } = await supabase
-              .from('users')
-              .select('expo_push_token')
-              .eq('id', recipientId)
-              .single();
-            if (userData?.expo_push_token) {
-              if (window.api?.sendPushNotification) {
-                await window.api.sendPushNotification(userData.expo_push_token, title, msg, { type: 'compliance_update', organizationId: data.organization_id });
-              }
-            }
-          } catch (pushErr) { }
-        }
+        } catch (pushErr) { }
       }
     }
 

@@ -169,17 +169,25 @@ const RoleBadge = styled.span`
   padding: 3px 10px;
   border-radius: 20px;
   background: ${p => {
-    if (p.$r === 'admin') return '#fce7f3';
+    if (p.$r === 'admin' || p.$r === 'admin_assistant') return '#fce7f3';
     if (p.$r === 'osas_staff') return '#dbeafe';
     if (p.$r === 'student_leader') return '#d1fae5';
     if (p.$r === 'advisor') return '#fef3c7';
+    if (p.$r === 'gso') return '#e0f2fe';
+    if (p.$r === 'pso') return '#ccfbf1';
+    if (p.$r === 'supply') return '#fef08a';
+    if (p.$r === 'venue') return '#ede9fe';
     return '#f3f4f6';
   }};
   color: ${p => {
-    if (p.$r === 'admin') return '#9d174d';
+    if (p.$r === 'admin' || p.$r === 'admin_assistant') return '#9d174d';
     if (p.$r === 'osas_staff') return '#1d4ed8';
     if (p.$r === 'student_leader') return '#065f46';
     if (p.$r === 'advisor') return '#92400e';
+    if (p.$r === 'gso') return '#0284c7';
+    if (p.$r === 'pso') return '#0d9488';
+    if (p.$r === 'supply') return '#ca8a04';
+    if (p.$r === 'venue') return '#7c3aed';
     return '#374151';
   }};
   text-transform: capitalize;
@@ -273,14 +281,22 @@ const LoadingRow = styled.div`
 
 const ROLE_COLORS = {
   admin: '#9d174d',
+  admin_assistant: '#db2777',
   osas_staff: '#1d4ed8',
   student_leader: GREEN,
   advisor: '#92400e',
+  gso: '#0284c7',
+  pso: '#0d9488',
+  supply: '#ca8a04',
+  venue: '#7c3aed',
   student: '#6b7280',
 };
 
 function formatRole(role) {
-  return role?.replace(/_/g, ' ') || '—';
+  if (!role) return '—';
+  const upperRoles = ['gso', 'pso'];
+  if (upperRoles.includes(role)) return role.toUpperCase();
+  return role.replace(/_/g, ' ');
 }
 
 export default function AdminUsers() {
@@ -331,7 +347,7 @@ export default function AdminUsers() {
 
   const totalActive = users.filter(u => u.is_active).length;
   const totalStudents = users.filter(u => u.role === 'student' || u.role === 'student_leader').length;
-  const totalStaff = users.filter(u => u.role === 'admin' || u.role === 'osas_staff').length;
+  const totalStaff = users.filter(u => ['admin', 'admin_assistant', 'osas_staff', 'gso', 'pso', 'supply', 'venue'].includes(u.role)).length;
   const totalAdvisors = users.filter(u => u.role === 'advisor').length;
 
   return (
@@ -354,9 +370,14 @@ export default function AdminUsers() {
           <FilterSelect value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>
+            <option value="admin_assistant">Admin Assistant</option>
             <option value="osas_staff">OSAS Staff</option>
             <option value="student_leader">Student Leader</option>
             <option value="advisor">Advisor</option>
+            <option value="gso">GSO</option>
+            <option value="pso">PSO</option>
+            <option value="supply">Supply</option>
+            <option value="venue">Venue</option>
             <option value="student">Student</option>
           </FilterSelect>
           <RefreshBtn onClick={load} disabled={loading}>

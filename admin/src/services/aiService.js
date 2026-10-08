@@ -4,7 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_GEMINI_API_KEY });
 
-// ─── Session persistence ────────────────────────────────────────────────────
+// ─── Session persistence ─────────────────────────────────────────────────────
 
 const makeId = () =>
   crypto.randomUUID ? crypto.randomUUID() : `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -90,24 +90,149 @@ export const deleteAllSessions = async () => {
   }
 };
 
-// ─── Intent Detection ───────────────────────────────────────────────────────
+// ─── System Knowledge Base ────────────────────────────────────────────────────
+// Describes the actual navigation and workflows of the Student Nexus system.
+// Used to generate accurate step-by-step instructions for officer users.
+
+const SYSTEM_KNOWLEDGE = `
+You are the Student Nexus Intelligent Agent — a professional, friendly, and highly knowledgeable assistant for the Student Nexus platform.
+The platform has THREE components:
+1. MOBILE APP (React Native/Expo) — Used by Student Organization Officers
+2. ADMIN DASHBOARD (Electron Desktop App) — Used by OSAS Administrators and office staff
+3. PUBLIC WEBSITE — Used by students and the public to view events, organizations, and announcements
+
+You are responding to an OSAS Administrator on the Admin Dashboard.
+When answering HOW-TO questions, you MUST:
+- Always provide clear, numbered step-by-step instructions
+- Use the EXACT navigation labels and terms from the actual system (listed below)
+- Be concise but thorough
+- Format using markdown with numbered steps and bold key terms
+
+ACTUAL SYSTEM NAVIGATION FOR OFFICERS (Mobile App):
+- Home Tab: Dashboard with stats, announcements, upcoming events
+- Events Tab: List of events with "+" FAB button to propose an event → CreateEvent screen
+- Compliance Tab: Two sub-tabs — "Accreditation" and "Clearance"
+- Portfolio Tab: Student achievements and portfolio items
+- Calendar Tab: Monthly calendar showing approved/pending events
+- Messages Tab: Direct messaging with other users and OSAS Admin
+- Profile Tab: User info, edit profile, upload profile picture, change password
+
+ACTUAL EVENT PROPOSAL WORKFLOW (Mobile App):
+1. Events tab → tap "+" (FAB button at bottom right)
+2. Fill in: Event Title, Event Date, Start Time, End Time, Venue, Expected Attendees, Budget, Description
+3. Attach supporting documents (optional)
+4. Tap "Submit Proposal"
+5. Status = "Pending" — awaiting OSAS review
+6. OSAS Admin reviews and Approves/Rejects/Requests Revision
+7. Officer receives notification + in-app notification
+8. If approved, event appears on the shared Event Calendar
+
+ACTUAL COMPLIANCE WORKFLOW (Mobile App):
+ACCREDITATION:
+1. Compliance tab → tap "Accreditation"
+2. View list of accreditation requirements
+3. Tap a requirement card to expand it
+4. Tap "Upload Document" → choose file from device
+5. Document status changes to "Pending Review"
+6. OSAS reviews and sets status to Approved or Rejected
+7. If Rejected, view remarks → tap "Edit/Update Document" → upload revised file
+
+CLEARANCE:
+1. Compliance tab → tap "Clearance"
+2. Same flow as Accreditation but for end-of-semester clearance documents
+
+EDITING/UPDATING A COMPLIANCE DOCUMENT:
+1. Compliance tab → find your submitted document
+2. Tap the document card to expand it
+3. Tap "Edit/Update Document"
+4. Read the admin remarks (if any)
+5. Upload the revised/new file
+6. The system records this as a new version
+7. OSAS Admin is notified of the update
+
+ACTUAL VENUE/BOOKING WORKFLOW:
+1. Events tab → tap "+" to create a new event
+2. In the form, select a venue from the Venue field
+3. The system checks for conflicts on the selected date and venue
+4. If conflict exists, a warning is shown
+5. Submit the event proposal
+6. The event goes through OSAS + relevant office approvals
+
+CHECKING EVENT STATUS:
+1. Events tab → see the status badge on each event card
+2. Tap the event card to open Event Details
+3. View the "Approval History" section for step-by-step office decisions
+4. Statuses: Pending → Approved / Rejected / Revision Required
+
+ANNOUNCEMENTS:
+- Officers see announcements on the Home screen
+- Public website visitors see approved announcements on the homepage
+
+PROFILE UPDATE:
+1. Profile tab → tap your avatar/name
+2. Tap "Edit Profile"
+3. Change your name or contact number
+4. Tap profile picture to upload/change photo
+5. Tap "Save"
+
+CONTACT AN OFFICE / MESSAGE OSAS:
+1. Messages tab → tap the compose button
+2. Search for the recipient (OSAS Admin, office staff)
+3. Type and send your message
+
+DATA INTENTS (for showing live database widgets):
+- "dashboard" → show live stats widget
+- "events" → list event proposals (filter: pending/approved/rejected/completed)
+- "orgs" → list organizations
+- "users" → list user accounts
+- "compliance" → list compliance records
+- "logs" → show recent audit logs
+
+For data queries, ALWAYS include the intent in your JSON response.
+For how-to/procedural questions, set intent to "how_to" and write clear step-by-step instructions in the text field.
+For general conversation, set intent to "unknown".
+
+RESPONSE FORMAT — Always respond with this exact JSON (no code block wrapping):
+{
+  "text": "Your professional markdown-formatted response with step-by-step instructions if applicable...",
+  "intent": "intent_name",
+  "filter": "filter_value or null"
+}
+`;
+
+// ─── Intent Detection (local fallback) ────────────────────────────────────────
 
 const detect = (txt) => {
   const t = txt.toLowerCase();
 
-  // Greetings
   if (/^(hi|hello|hey|good\s*(morning|afternoon|evening|night)|what's up|sup)\b/.test(t))
     return { intent: 'greet' };
 
-  // Help
   if (/\b(help|commands?|what can you|what do you know)\b/.test(t))
     return { intent: 'help' };
 
-  // Dashboard summary
   if (/\b(dashboard|summary|overview|stats|statistics|total)\b/.test(t))
     return { intent: 'dashboard' };
 
-  // Event proposals
+  // HOW-TO patterns — officer workflow questions
+  if (/\b(how\s*(can|do|to|should|would)|how\s+do\s+i|steps?\s+to|guide\s+(me|for)|walk\s+me)\b/.test(t))
+    return { intent: 'how_to' };
+
+  if (/\b(schedule|propose|create|add|submit)\b/.test(t) && /\b(event|activity)\b/.test(t))
+    return { intent: 'how_to', topic: 'propose_event' };
+
+  if (/\b(book|reserve|request)\b/.test(t) && /\b(venue|avr|room|hall)\b/.test(t))
+    return { intent: 'how_to', topic: 'book_venue' };
+
+  if (/\b(accreditation|accredit)\b/.test(t))
+    return { intent: 'how_to', topic: 'accreditation' };
+
+  if (/\b(clearance)\b/.test(t))
+    return { intent: 'how_to', topic: 'clearance' };
+
+  if (/\b(profile|picture|photo|avatar)\b/.test(t))
+    return { intent: 'how_to', topic: 'profile' };
+
   if (/\b(event|events|proposal|proposals)\b/.test(t)) {
     if (/\b(pending|for review|waiting)\b/.test(t)) return { intent: 'events', filter: 'pending' };
     if (/\b(approved?)\b/.test(t))                  return { intent: 'events', filter: 'approved' };
@@ -116,97 +241,22 @@ const detect = (txt) => {
     return { intent: 'events', filter: null };
   }
 
-  // Organizations
   if (/\b(org|orgs|organization|organizations|club|clubs)\b/.test(t))
     return { intent: 'orgs' };
 
-  // Users
   if (/\b(user|users|student|students|member|members)\b/.test(t))
     return { intent: 'users' };
 
-  // Compliance
   if (/\b(compliance|comply|requirement|requirements|deadline)\b/.test(t))
     return { intent: 'compliance' };
 
-  // Audit logs
   if (/\b(log|logs|audit|activity|recent|history)\b/.test(t))
     return { intent: 'logs' };
 
   return { intent: 'unknown' };
 };
 
-// ─── Response Formatters ────────────────────────────────────────────────────
-
-const fmt = {
-  greet: () => ({
-    text: `### Good day, Admin! 👋\n\nI'm the **OSAS Intelligent Agent** — your live database assistant.\n\nI can help you check:\n- 📋 **Events & Proposals**\n- 🏛️ **Organizations**\n- 👥 **Users**\n- ✅ **Compliance**\n- 📜 **Audit Logs**\n- 📊 **Dashboard Summary**\n\nJust ask naturally! Try: *"show pending events"* or *"how many organizations are there?"*`,
-    type: 'help',
-    payload: null
-  }),
-
-  help: () => ({
-    text: `### 📖 Available Commands\n\n| Command | What it does |\n|---|---|\n| \`dashboard\` or \`summary\` | Show key statistics |\n| \`events\` / \`proposals\` | List all event proposals |\n| \`pending events\` | Show events awaiting approval |\n| \`approved events\` | Show approved events |\n| \`rejected events\` | Show rejected events |\n| \`organizations\` | List all registered orgs |\n| \`users\` | Show user account summary |\n| \`compliance\` | Show compliance requirements |\n| \`audit logs\` | Show recent system activity |\n\n> 💡 You can also type naturally like *"how many events are pending?"*`,
-    type: 'help',
-    payload: null
-  }),
-
-  dashboard: async () => {
-    const { data } = await adminAPI.getDashboardStats();
-    if (!data) return { text: '⚠️ Could not load dashboard stats.', type: 'error', payload: null };
-    const d = Array.isArray(data) ? data[0] : data;
-    return {
-      text: '### 📊 Dashboard Summary\nHere is the current overview of the system:',
-      type: 'dashboard',
-      payload: d
-    };
-  },
-
-  events: async (filter) => {
-    const { data } = await adminAPI.getEventProposals();
-    if (!data || data.length === 0) return { text: '📭 No event proposals found in the database.', type: 'error', payload: null };
-    const list = filter ? data.filter(e => e.status === filter) : data;
-    if (list.length === 0) return { text: `📭 No **${filter}** events found.`, type: 'error', payload: null };
-
-    const statusEmoji = { pending: '🕐', approved: '✅', rejected: '❌', completed: '🏁' };
-    const header = filter
-      ? `### ${statusEmoji[filter] || '📋'} ${filter.charAt(0).toUpperCase() + filter.slice(1)} Events (${list.length})\nHere are the specific events:`
-      : `### 📋 All Event Proposals (${list.length})\nHere are all events in the database:`;
-
-    return { text: header, type: 'events', payload: list };
-  },
-
-  orgs: async () => {
-    const { data } = await adminAPI.getOrganizations();
-    if (!data || data.length === 0) return { text: '📭 No organizations found in the database.', type: 'error', payload: null };
-    return { text: `### 🏛️ Registered Organizations (${data.length})\nHere are all the student organizations:`, type: 'orgs', payload: data };
-  },
-
-  users: async () => {
-    const { data } = await adminAPI.getUsers();
-    if (!data || data.length === 0) return { text: '📭 No users found in the database.', type: 'error', payload: null };
-    return { text: `### 👥 User Accounts (${data.length} total)\nHere is the breakdown of users:`, type: 'users', payload: data };
-  },
-
-  compliance: async () => {
-    const { data } = await adminAPI.getComplianceList();
-    if (!data || data.length === 0) return { text: '📭 No compliance records found.', type: 'error', payload: null };
-    return { text: `### ✅ Compliance Status (${data.length} records)\nHere are the compliance requirements:`, type: 'compliance', payload: data };
-  },
-
-  logs: async () => {
-    const { data } = await adminAPI.getAuditLogs(15);
-    if (!data || data.length === 0) return { text: '📭 No recent audit activity found.', type: 'error', payload: null };
-    return { text: `### 📜 Recent System Activity\nHere are the last 15 actions performed in the system:`, type: 'logs', payload: data };
-  },
-
-  unknown: (txt) => ({
-    text: `### 🤔 I didn't quite understand that\n\nI couldn't find a matching command for: *"${txt}"*\n\nTry one of these:\n- \`show events\` / \`pending events\`\n- \`organizations\`\n- \`users\`\n- \`compliance\`\n- \`audit logs\`\n- \`dashboard summary\`\n\nType **help** to see the full command list.`,
-    type: 'unknown',
-    payload: null
-  })
-};
-
-// ─── Local Database Agent ───────────────────────────────────────────────────
+// ─── Local Database Agent ─────────────────────────────────────────────────────
 
 export class AIAssistantSession {
   constructor(existingSessionId = null) {
@@ -216,84 +266,82 @@ export class AIAssistantSession {
 
   async sendMessage(userInput) {
     const txt = (userInput || '').trim();
-    
-    // We will use Gemini to determine the intent and generate a professional response
+
     let responseObj;
     try {
-      const prompt = `You are the OSAS Intelligent Agent, a highly professional, helpful, and polite virtual operations assistant for the Student Nexus administration platform.
-Your job is to respond to the user professionally and intelligently. The user is an administrator.
-Based on the user's input, you must determine if you need to pull data from the database to show them a widget.
-
-Available data intents (commands):
-- "greet": General greeting or asking how you are.
-- "help": Asking for help or what you can do.
-- "dashboard": Asking for dashboard summary, overview, or statistics.
-- "events": Asking about event proposals. You can set the filter to "pending", "approved", "rejected", "completed", or null.
-- "orgs": Asking about registered organizations or clubs.
-- "users": Asking about user accounts or members.
-- "compliance": Asking about compliance records, requirements, or deadlines.
-- "logs": Asking about audit logs, recent system activity, or history.
-- "unknown": If the user's request does not match any of the above intents or is conversational without needing data.
-
-Respond ONLY with a valid JSON object in this exact format, with no markdown code blocks wrapping the JSON:
-{
-  "text": "Your highly professional and friendly response formatted in Markdown...",
-  "intent": "intent_name",
-  "filter": "filter_name or null"
-}
+      const prompt = `${SYSTEM_KNOWLEDGE}
 
 User input: "${txt}"`;
 
-      const aiResponse = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: prompt,
-        config: { 
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              text: { type: "STRING" },
-              intent: { type: "STRING" },
-              filter: { type: "STRING", nullable: true }
-            },
-            required: ["text", "intent"]
+      let aiResponse;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          aiResponse = await ai.models.generateContent({
+            model: 'gemini-3.6-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'OBJECT',
+                properties: {
+                  text:   { type: 'STRING' },
+                  intent: { type: 'STRING' },
+                  filter: { type: 'STRING', nullable: true }
+                },
+                required: ['text', 'intent']
+              }
+            }
+          });
+          break; // success
+        } catch (apiErr) {
+          if (apiErr?.status === 503 && retries > 1) {
+            retries--;
+            console.warn(`[Gemini 503] Retrying... (${retries} left)`);
+            await new Promise(res => setTimeout(res, 2000)); // wait 2s before retry
+          } else {
+            throw apiErr;
           }
         }
-      });
+      }
 
       const parsed = JSON.parse(aiResponse.text);
 
-      
       const intent = parsed.intent || 'unknown';
       const filter = parsed.filter || null;
       let payload = null;
 
-      try {
-        switch (intent) {
-          case 'dashboard':
-            payload = (await adminAPI.getDashboardStats()).data;
-            if (Array.isArray(payload)) payload = payload[0];
-            break;
-          case 'events':
-            payload = (await adminAPI.getEventProposals()).data;
-            if (payload && filter) payload = payload.filter(e => e.status === filter);
-            break;
-          case 'orgs':
-            payload = (await adminAPI.getOrganizations()).data;
-            break;
-          case 'users':
-            payload = (await adminAPI.getUsers()).data;
-            break;
-          case 'compliance':
-            payload = (await adminAPI.getComplianceList()).data;
-            break;
-          case 'logs':
-            payload = (await adminAPI.getAuditLogs(15)).data;
-            break;
+      // Fetch live data for data-display intents
+      if (intent !== 'how_to' && intent !== 'unknown' && intent !== 'greet' && intent !== 'help') {
+        try {
+          switch (intent) {
+            case 'dashboard':
+              payload = (await adminAPI.getDashboardStats()).data;
+              if (Array.isArray(payload)) payload = payload[0];
+              break;
+            case 'events':
+              payload = (await adminAPI.getEventProposals()).data;
+              if (payload && filter) payload = payload.filter(e => e.status === filter);
+              break;
+            case 'orgs':
+              payload = (await adminAPI.getOrganizations()).data;
+              break;
+            case 'users':
+              payload = (await adminAPI.getUsers()).data;
+              break;
+            case 'compliance':
+              payload = (await adminAPI.getComplianceList()).data;
+              break;
+            case 'logs':
+              payload = (await adminAPI.getAuditLogs(15)).data;
+              break;
+            default:
+              break;
+          }
+        } catch (dbErr) {
+          console.error('[Database Fetch Error]', dbErr);
+          parsed.text += '\n\n*(Note: I encountered an error while retrieving data.)*';
         }
-      } catch (dbErr) {
-        console.error('[Database Fetch Error]', dbErr);
-        parsed.text += "\n\n*(Note: I encountered an error while retrieving the requested data from the database.)*";
       }
 
       responseObj = {
@@ -304,11 +352,58 @@ User input: "${txt}"`;
 
     } catch (err) {
       console.error('[Agent Error]', err);
-      // Fallback if Gemini fails
-      responseObj = { text: `⚠️ **AI Service Error**: Could not connect to the intelligent agent.\n\n*${err.message}*`, type: 'error', payload: null };
+      // Fallback to local detect if Gemini fails
+      const detected = detect(txt);
+      let payload = null;
+      let textResponse = `*(Offline Mode)* I understood you want to see **${detected.intent}**. Here is the data:`;
+
+      if (detected.intent === 'greet') {
+        textResponse = `*(Offline Mode)* Hello! How can I help you today? Type **help** to see what I can do.`;
+      } else if (detected.intent === 'help') {
+        textResponse = `*(Offline Mode)* I can show you your dashboard, events, users, compliance records, and audit logs. Just ask!`;
+      } else if (detected.intent === 'unknown') {
+        textResponse = `*(Offline Mode)* I am currently running in limited offline mode and didn't understand that. Try asking for "dashboard", "events", or "users".`;
+      } else if (detected.intent !== 'how_to') {
+        try {
+          switch (detected.intent) {
+            case 'dashboard':
+              payload = (await adminAPI.getDashboardStats()).data;
+              if (Array.isArray(payload)) payload = payload[0];
+              break;
+            case 'events':
+              payload = (await adminAPI.getEventProposals()).data;
+              if (payload && detected.filter) payload = payload.filter(e => e.status === detected.filter);
+              break;
+            case 'orgs':
+              payload = (await adminAPI.getOrganizations()).data;
+              break;
+            case 'users':
+              payload = (await adminAPI.getUsers()).data;
+              break;
+            case 'compliance':
+              payload = (await adminAPI.getComplianceList()).data;
+              break;
+            case 'logs':
+              payload = (await adminAPI.getAuditLogs(15)).data;
+              break;
+            default:
+              break;
+          }
+        } catch (dbErr) {
+          console.error('[Database Fetch Error Offline]', dbErr);
+          textResponse += '\n\n*(Note: I encountered an error retrieving data from the database.)*';
+        }
+      } else {
+        textResponse = `*(Offline Mode)* I cannot answer complex how-to questions while offline.`;
+      }
+
+      responseObj = {
+        text: textResponse,
+        type: detected.intent === 'unknown' ? null : detected.intent,
+        payload
+      };
     }
 
-    // Append to history for session persistence (saving only the text so as not to bloat DB)
     this.history.push(
       { role: 'user',  parts: [{ text: txt }] },
       { role: 'model', parts: [{ text: responseObj.text }] }

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { HiHome, HiUserGroup, HiCalendar, HiMenu, HiSpeakerphone } from 'react-icons/hi';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+
 const navItems = [
   { name: 'Home', path: '/', icon: <HiHome className="text-2xl" /> },
   { name: 'Orgs', path: '/#organizations', icon: <HiUserGroup className="text-2xl" /> },
@@ -11,8 +12,9 @@ const navItems = [
 ];
 
 const extraLinks = [
-  { name: 'Team', path: '/#staff' },
-  { name: 'Contact', path: '/#contact' },
+  { name: 'Team', path: '/#staff', external: false },
+  { name: 'Contact', path: '/#contact', external: false },
+  { name: 'Submit Online', path: 'http://localhost:5174', external: true },
 ];
 
 const BottomNav = () => {
@@ -42,7 +44,7 @@ const BottomNav = () => {
         const padding = 16; // px-2 is 8px on each side
         setItemWidth((totalWidth - padding) / navItems.length);
       };
-      
+
       updateWidth();
       window.addEventListener('resize', updateWidth);
       return () => window.removeEventListener('resize', updateWidth);
@@ -53,7 +55,7 @@ const BottomNav = () => {
     <>
       {/* Overlay for Extra Menu */}
       {isMenuOpen && (
-        <div 
+        <div
           className="md:hidden fixed inset-0 bg-black/20 z-[55]"
           onClick={() => setIsMenuOpen(false)}
         />
@@ -67,7 +69,11 @@ const BottomNav = () => {
               key={link.name}
               className="px-4 py-3 bg-gray-50 dark:bg-[#0f1117] rounded-xl text-center text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-pointer"
               onClick={() => {
-                navigate(link.path);
+                if (link.external) {
+                  window.open(link.path, '_blank', 'noopener,noreferrer');
+                } else {
+                  navigate(link.path);
+                }
                 setIsMenuOpen(false);
               }}
             >
@@ -79,17 +85,17 @@ const BottomNav = () => {
 
       {/* Main Bottom Nav */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[400px] z-[60]">
-        <div 
+        <div
           ref={containerRef}
           className="bg-osas-primary text-white dark:bg-[#1e2430] rounded-[32px] h-[72px] shadow-2xl flex items-center relative px-2"
         >
-          
+
           {/* Floating Indicator with thick border for cutout effect */}
           {itemWidth > 0 && (
             <motion.div
               className="absolute top-[-26px] w-[64px] h-[64px] bg-osas-primary dark:bg-[#1e2430] rounded-full border-[8px] border-white dark:border-[#0f1117] z-10"
               initial={false}
-              animate={{ 
+              animate={{
                 x: (activeIndex * itemWidth) + (itemWidth / 2) - 32 + 8,
               }}
               transition={{ type: "spring", stiffness: 350, damping: 30 }}
@@ -99,7 +105,7 @@ const BottomNav = () => {
           {navItems.map((item, index) => {
             const isActive = activeIndex === index;
             const isMenu = item.name === 'Menu';
-            
+
             return (
               <div
                 key={item.name}
@@ -117,7 +123,7 @@ const BottomNav = () => {
               >
                 <motion.div
                   initial={false}
-                  animate={{ 
+                  animate={{
                     y: (isActive && !isMenu) ? -30 : (isMenu && isMenuOpen ? -4 : 0),
                     color: (isActive && !isMenu) ? '#ffffff' : '#a7f3d0' // a light green for inactive, white for active
                   }}
@@ -126,11 +132,11 @@ const BottomNav = () => {
                 >
                   {item.icon}
                 </motion.div>
-                
+
                 <motion.span
                   initial={false}
-                  animate={{ 
-                    opacity: (isActive && !isMenu) ? 1 : 0, 
+                  animate={{
+                    opacity: (isActive && !isMenu) ? 1 : 0,
                     y: (isActive && !isMenu) ? 14 : 20,
                     scale: (isActive && !isMenu) ? 1 : 0.8
                   }}

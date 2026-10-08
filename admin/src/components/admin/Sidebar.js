@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, KanbanSquare, ClipboardList,
   Users, Settings, LogOut, Bot, Award, ShieldCheck,
-  FileBarChart, Calendar, MessageSquare, Package,
+  FileBarChart, Calendar, MessageSquare,
   Archive, Megaphone, Mail
 } from 'lucide-react';
 import { useSidebar } from './SidebarContext';
+import { supabase } from '../../config/supabase';
 
 const GREEN = '#03632B';
 const SIDEBAR_NARROW = 72;
@@ -128,6 +129,8 @@ const IconButton = styled.button`
   }
 `;
 
+const OFFICE_ROLES = ['gso', 'pso', 'supply', 'venue', 'admin_assistant'];
+
 // Grouped navigation
 const NAV_GROUPS = [
   {
@@ -151,7 +154,6 @@ const NAV_GROUPS = [
       { to: '/messages', icon: MessageSquare, label: 'Messages' },
       { to: '/contact-messages', icon: Mail, label: 'Contact Inbox' },
       { to: '/search', icon: Bot, label: 'AI Assistant' },
-      { to: '/faculty-requests', icon: Package, label: 'Faculty Requests' },
     ],
   },
   {
@@ -169,11 +171,35 @@ const NAV_GROUPS = [
 const Sidebar = () => {
   const { collapsed } = useSidebar();
   const open = !collapsed;
+  
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('users').select('role').eq('id', user.id).single();
+        if (data) setUserRole(data.role);
+      }
+    };
+    fetchRole();
+  }, []);
+
+  // Filter items for office roles vs full admin roles
+  const filteredGroups = NAV_GROUPS.map(group => {
+    if (!OFFICE_ROLES.includes(userRole)) return group;
+    // For office roles, only show limited items
+    const allowed = ['/dashboard', '/calendar', '/register', '/compliance', '/messages', '/kanban'];
+    return {
+      ...group,
+      items: group.items.filter(item => allowed.includes(item.to))
+    };
+  }).filter(group => group.items.length > 0);
 
   return (
     <SidebarContainer $open={open}>
       <NavList>
-        {NAV_GROUPS.map(group => (
+        {filteredGroups.map(group => (
           <React.Fragment key={group.label}>
             <SectionLabel $open={open}>{group.label}</SectionLabel>
             {group.items.map(({ to, icon: Icon, label }) => (

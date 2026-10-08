@@ -82,7 +82,8 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
           // Get icon
           let iconName = 'circle';
           if (route.name === 'Home') iconName = 'home';
-          if (route.name === 'Events') iconName = 'calendar';
+          if (route.name === 'Events') iconName = 'layout';
+          if (route.name === 'Calendar') iconName = 'calendar';
           if (route.name === 'Messages') iconName = 'message-circle';
           if (route.name === 'Compliance') iconName = 'check-square';
           if (route.name === 'Profile') iconName = 'user';

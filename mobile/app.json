@@ -33,8 +33,14 @@
     "plugins": [
       "expo-font",
       "expo-web-browser",
-      "expo-notifications",
-      "expo-updates"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Student Nexus to access your photos.",
+          "cameraPermission": "Allow Student Nexus to use your camera."
+        }
+      ]
     ],
     "extra": {
       "eas": {
